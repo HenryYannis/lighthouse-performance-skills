@@ -78,7 +78,25 @@ Or manually approving the package build scripts:
 npm approve-scripts sharp
 ```
 
-### 2. Manual CLI Usage
+### 2. Try the Demo (Test it in 1 minute!)
+
+You can instantly test the audit and optimization workflow on the included `/example` project:
+
+1. Start a local server to host the demo page:
+   ```bash
+   npx http-server ./example -p 8080
+   ```
+2. In another terminal, run the performance audit script:
+   ```bash
+   npm run audit -- --url http://localhost:8080 --output reports/demo-report.json
+   ```
+   *This will output `reports/demo-report.json`, `reports/demo-report.md`, and an interactive `reports/demo-report.html`.*
+3. Optimize the large demo image:
+   ```bash
+   npm run optimize -- --dir ./example/images --quality 80
+   ```
+
+### 3. Manual CLI Usage
 
 While these tools are optimized for AI automation, you can run them directly:
 

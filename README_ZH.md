@@ -78,7 +78,25 @@ npm install
 npm approve-scripts sharp
 ```
 
-### 2. 独立运行脚本工具
+### 2. 试用 Demo (1分钟极速上手体验)
+
+您可以直接使用项目中自带的 `/example` 演示页面来体验审计与优化工作流：
+
+1. 启动本地静态服务器托管 demo 网页：
+   ```bash
+   npx http-server ./example -p 8080
+   ```
+2. 在另一个终端窗口运行性能审计脚本：
+   ```bash
+   npm run audit -- --url http://localhost:8080 --output reports/demo-report.json
+   ```
+   *这将在 `reports/` 目录下导出 `demo-report.json`、`demo-report.md` 简报以及可在浏览器中直接打开的交互式 `demo-report.html`。*
+3. 一键优化 Demo 中未压缩的大图：
+   ```bash
+   npm run optimize -- --dir ./example/images --quality 80
+   ```
+
+### 3. 独立运行脚本工具
 
 虽然这些工具是设计给 AI 调用的，您也可以手动运行它们：
 
