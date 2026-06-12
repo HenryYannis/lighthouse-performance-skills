@@ -1,0 +1,26 @@
+{
+  "name": "lighthouse-performance-skills",
+  "version": "1.0.0",
+  "description": "Lighthouse & Web Vitals Performance Optimization Agent Skill",
+  "main": "scripts/run-lighthouse.js",
+  "type": "module",
+  "scripts": {
+    "audit": "node scripts/run-lighthouse.js",
+    "optimize": "node scripts/optimize-images.js"
+  },
+  "keywords": [
+    "lighthouse",
+    "performance",
+    "web-vitals",
+    "agent-skill",
+    "optimize"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "chrome-launcher": "^1.1.1",
+    "fs-extra": "^11.2.0",
+    "lighthouse": "^11.5.0",
+    "sharp": "^0.33.2"
+  }
+}
