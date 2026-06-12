@@ -1,0 +1,64 @@
+---
+description: Automatically audit, analyze, and optimize web application performance (Lighthouse & Web Vitals).
+globs: *
+---
+
+# Lighthouse & Web Vitals Performance Optimization Rule
+
+This rule guides you through the process of diagnosing web application performance issues and automatically implementing modern optimization techniques to achieve perfect Lighthouse scores and pass Core Web Vitals.
+
+## Step-by-Step Optimization Workflow
+
+### Step 1: Establish a Baseline Audit (性能诊断)
+Before making any performance modifications, run a diagnostic audit to establish a baseline.
+
+1. **Verify Environment**: Verify if `node_modules` exists in the `lighthouse-performance-skills` directory. If dependencies are not installed, run `npm install` first.
+2. **Verify Dev Server**: Ensure the local development server (or production build server) is running.
+3. **Run Lighthouse Script**: Use the helper script `run-lighthouse.js` to run a headless Chrome audit on the target URL:
+   ```bash
+   node scripts/run-lighthouse.js --url http://localhost:3000 --output reports/baseline.json
+   ```
+4. **Parse Metrics**: Check the generated report. Focus on the core Web Vitals (LCP, INP, CLS, FCP).
+
+---
+
+### Step 2: Asset Optimization (资源优化)
+
+#### 1. Image Compression & Modern Formats
+Images are usually the largest payload. Run `optimize-images.js` to batch-process local images:
+```bash
+node scripts/optimize-images.js --dir ./public/assets/images --quality 80
+```
+- **Action**: Convert images to WebP/AVIF.
+- **HTML Modification**: Update standard `<img>` tags to use `<picture>` tags or modern image attributes:
+  ```html
+  <picture>
+    <source srcset="image.webp" type="image/webp">
+    <img src="image.jpg" alt="Description" loading="lazy" width="800" height="600">
+  </picture>
+  ```
+
+#### 2. Layout Shift (CLS) Prevention
+- Always specify `width` and `height` dimensions on `<img>` and `<video>` tags, or reserve space with CSS Aspect Ratio.
+
+---
+
+### Step 3: Script & Style Optimization (脚本与样式优化)
+
+#### 1. Eliminate Render-Blocking Resources
+- **CSS**: Extract critical inline styles for above-the-fold content, and load non-critical CSS asynchronously.
+- **JS**: Load non-critical scripts using `defer` or `async`.
+
+#### 2. Code Splitting & Dynamic Imports
+For large single-page applications, split bundles dynamically (e.g. `React.lazy` or ES6 Dynamic Imports).
+
+---
+
+### Step 4: Run Verification Audit (效果验证)
+After implementing performance changes:
+1. Re-run the Lighthouse script on the same URL:
+   ```bash
+   node scripts/run-lighthouse.js --url http://localhost:3000 --output reports/optimized.json
+   ```
+2. Compare the baseline audit with the optimized audit.
+3. Present a performance improvement table to the user (Metrics, Baseline Score, Optimized Score, % Improvement).

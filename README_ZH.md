@@ -42,7 +42,11 @@
 
 ```text
 lighthouse-performance-skills/
-├── SKILL.md                  # AI Agent 的核心执行指令文件（核心）
+├── skills/
+│   └── lighthouse-performance-skills/
+│       └── SKILL.md          # 遵循 Open Plugins 规范的 Agent 指令文件
+├── rules/
+│   └── lighthouse-performance.mdc # 遵循 Cursor MDC 规范的指令文件
 ├── package.json              # 项目依赖与运行脚本
 ├── README.md                 # 项目介绍 (英文)
 ├── README_ZH.md              # 项目介绍 (中文)
@@ -118,22 +122,22 @@ npm run optimize -- --dir ./public/assets/images --quality 80
 ## 🤖 如何导入到您的 AI 编码助手？
 
 ### 1. 在 Antigravity 中使用
-将该目录放入您的项目根目录中。当您对 Antigravity 提出类似“优化我们网站的加载速度”或“提高 Lighthouse 分数”的要求时，Antigravity 会自动读取并执行 `SKILL.md` 中定义的标准步骤。
+将该目录放入您的项目根目录中。当您对 Antigravity 提出类似“优化我们网站的加载速度”或“提高 Lighthouse 分数”的要求时，Antigravity 会自动读取并执行 `skills/lighthouse-performance-skills/SKILL.md` 中定义的标准步骤。
 
-### 2. 在 Cursor 中使用 (.cursorrules)
-在您的项目根目录下创建 `.cursorrules` 文件，并将 `SKILL.md` 的内容或引用加入其中：
+### 2. 在 Cursor 中使用 (.cursorrules & .mdc)
+由于本项目完全遵循 Open Plugins 标准，当您将仓库提交到插件目录后，Cursor 会自动识别并注册 `rules/lighthouse-performance.mdc` 规则。您也可以直接将 `rules/lighthouse-performance.mdc` 复制到本地项目的 `.cursor/rules/` 目录下，或在您的 `.cursorrules` 文件中添加以下规则引用：
 ```markdown
-对于任何关于性能优化的需求，请严格参考 lighthouse-performance-skills/SKILL.md 中定义的工作流：
-1. 运行 node scripts/run-lighthouse.js 建立跑分基线。
-2. 运行 node scripts/optimize-images.js 优化媒体资源。
+对于任何网页性能优化任务，请严格执行以下工作流：
+1. 运行 `node scripts/run-lighthouse.js` 建立跑分基线。
+2. 运行 `node scripts/optimize-images.js` 优化媒体资源。
 3. 执行代码级优化（延迟加载、代码分割、优化 CLS）。
 4. 重新审计并输出前后跑分对比表格。
 ```
 
 ### 3. 在 Claude Code 中使用
-在与 Claude CLI 交互时，您可以直接将本项目的 `SKILL.md` 作为上下文输入：
+在与 Claude CLI 交互时，您可以直接将本项目的 `skills/lighthouse-performance-skills/SKILL.md` 作为上下文输入：
 ```bash
-claude "阅读 lighthouse-performance-skills/SKILL.md，并帮我优化当前项目的性能"
+claude "阅读 skills/lighthouse-performance-skills/SKILL.md，并帮我优化当前项目的性能"
 ```
 
 ---

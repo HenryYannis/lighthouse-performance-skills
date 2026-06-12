@@ -42,7 +42,11 @@ With the rise of AI coding assistants like Cursor and Claude Code, we are delega
 
 ```text
 lighthouse-performance-skills/
-├── SKILL.md                  # Main instruction set for the AI Agent
+├── skills/
+│   └── lighthouse-performance-skills/
+│       └── SKILL.md          # Open Plugins format instruction set for agents
+├── rules/
+│   └── lighthouse-performance.mdc # Cursor MDC rules format instructions
 ├── package.json              # Project dependencies and run commands
 ├── README.md                 # English documentation (This file)
 ├── README_ZH.md              # Chinese documentation
@@ -118,22 +122,22 @@ npm run optimize -- --dir ./public/assets/images --quality 80
 ## 🤖 AI Agent Integration
 
 ### 1. In Antigravity / Gemini Code Agent
-Keep the skill directory in your workspace. When asking Antigravity to "optimize loading speeds" or "raise the Lighthouse score", the agent will read and execute the instructions in `SKILL.md` automatically.
+Keep the skill directory in your workspace. When asking Antigravity to "optimize loading speeds" or "raise the Lighthouse score", the agent will read and execute the instructions in `skills/lighthouse-performance-skills/SKILL.md` automatically.
 
-### 2. In Cursor (.cursorrules)
-Create a `.cursorrules` file in your repository root and add a reference:
+### 2. In Cursor (.cursorrules & .mdc)
+Because this repository conforms to the Open Plugins standard, Cursor can auto-detect the rule `rules/lighthouse-performance.mdc` when submitted to the registry. Alternatively, you can copy the contents of `rules/lighthouse-performance.mdc` to `.cursor/rules/lighthouse-performance.mdc` in your local project, or reference the workflow in your `.cursorrules`:
 ```markdown
-For any web performance optimization tasks, strictly follow the workflow defined in lighthouse-performance-skills/SKILL.md:
-1. Run `node scripts/run-lighthouse.js` to establish a performance baseline.
+For any web performance optimization tasks, follow the workflow defined in:
+1. Run `node scripts/run-lighthouse.js` to establish a baseline.
 2. Run `node scripts/optimize-images.js` to optimize images.
 3. Perform source code optimizations (defer scripts, lazy load, fix CLS dimensions).
 4. Run audit again to verify improvements and render a before/after comparison table.
 ```
 
 ### 3. In Claude Code
-You can pass `SKILL.md` as context when interacting with Claude:
+You can pass the skill file as context when interacting with Claude:
 ```bash
-claude "Read lighthouse-performance-skills/SKILL.md and optimize the landing page performance"
+claude "Read skills/lighthouse-performance-skills/SKILL.md and optimize the landing page performance"
 ```
 
 ---
