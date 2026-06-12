@@ -1,6 +1,7 @@
 ---
 name: lighthouse-performance-skills
 description: Automatically audit, analyze, and optimize web application performance (Lighthouse & Web Vitals).
+version: 1.0.0
 ---
 
 # Lighthouse & Web Vitals Performance Optimization Skill
