@@ -2,7 +2,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat-square)](http://makeapullrequest.com)
-[![GitHub Stars](https://img.shields.io/github/stars/your-username/lighthouse-performance-skills?style=flat-square&label=%E2%AD%90%20Stars)](https://github.com/your-username/lighthouse-performance-skills)
+[![GitHub Stars](https://img.shields.io/github/stars/HenryYannis/lighthouse-performance-skills?style=flat-square&label=%E2%AD%90%20Stars)](https://github.com/HenryYannis/lighthouse-performance-skills)
 
 > **面向 AI 编码助手（如 Antigravity、Cursor、Claude Code）的网页性能诊断与极致优化 Skill 插件包。让 AI 代理全自动分析你的网页，并将 Lighthouse 跑分飙升至 95+！**
 
