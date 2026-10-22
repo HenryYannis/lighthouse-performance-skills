@@ -2,7 +2,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat-square)](http://makeapullrequest.com)
-[![GitHub Stars](https://img.shields.io/github/stars/your-username/lighthouse-performance-skills?style=flat-square&label=%E2%AD%90%20Stars)](https://github.com/your-username/lighthouse-performance-skills)
+[![GitHub Stars](https://img.shields.io/github/stars/HenryYannis/lighthouse-performance-skills?style=flat-square&label=%E2%AD%90%20Stars)](https://github.com/HenryYannis/lighthouse-performance-skills)
 
 > **A reusable performance optimization and web diagnostics Skill package for AI coding agents (like Antigravity, Cursor, and Claude Code). Let AI agents audit your page and boost your Lighthouse score to 95+ automatically!**
 
