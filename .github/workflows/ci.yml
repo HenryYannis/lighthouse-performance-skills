@@ -28,6 +28,10 @@ jobs:
       - name: Check rules are in sync
         run: node scripts/sync-rules.js --check
 
+      # README、README_ZH、SKILL.md 里的 npx 命令必须固定到同一个提交
+      - name: Check npx pin is consistent
+        run: node scripts/pin-npx.js --check
+
       # 起一个静态服务器托管 example，跑一次完整 audit
       - name: Audit example page
         run: |
