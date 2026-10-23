@@ -8,7 +8,8 @@
   "type": "module",
   "scripts": {
     "audit": "node scripts/run-lighthouse.js",
-    "optimize": "node scripts/optimize-images.js"
+    "optimize": "node scripts/optimize-images.js",
+    "pin": "node scripts/pin-npx.js"
   },
   "keywords": [
     "lighthouse",

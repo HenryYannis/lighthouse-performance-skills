@@ -84,7 +84,7 @@ npm install
   ```
 - 通过 `npx` 运行时（没有项目 `package.json` 可以记录批准），改用参数。`--allow-remote=all` 是给 npm 12 的：它默认拒绝从网址下载的包，旧版 npm 会忽略这个参数：
   ```bash
-  npx -y --allow-remote=all --allow-scripts=sharp https://codeload.github.com/HenryYannis/lighthouse-performance-skills/tar.gz/14cb046376d37d5c44cbddd22cb52a42da527ae5 optimize --dir ./public/images
+  npx -y --allow-remote=all --allow-scripts=sharp https://codeload.github.com/HenryYannis/lighthouse-performance-skills/tar.gz/9154e243ba84e832d352e1b722d658f714cd35e5 optimize --dir ./public/images
   ```
 
 ### 2. 试用 Demo (1分钟极速上手体验)
@@ -148,10 +148,10 @@ npm run optimize -- --dir ./public/assets/images --in-place
 
 #### 📦 不克隆也能用
 两个工具都可以作为命令在任何目录下运行：
-命令固定到了某一个提交（`…/tar.gz/14cb046…`），`npx` 每次运行的都是可以审查的那份代码，而不是 `main` 上最新的代码。要升级，把这串哈希换成本仓库更新的提交即可。（命令下载的是该提交的压缩包，而不是用 `github:` 写法，因为 npm 10 的 `npx` 无法拉取固定到某个提交的 `github:` 地址。）
+命令固定到了某一个提交（`…/tar.gz/9154e24…`），`npx` 每次运行的都是可以审查的那份代码，而不是 `main` 上最新的代码。要升级，把这串哈希换成本仓库更新的提交即可（维护者：推送后运行 `git fetch && npm run pin`，所有地方一次改好）。（命令下载的是该提交的压缩包，而不是用 `github:` 写法，因为 npm 10 的 `npx` 无法拉取固定到某个提交的 `github:` 地址。）
 ```bash
-npx -y --allow-remote=all --allow-scripts=sharp https://codeload.github.com/HenryYannis/lighthouse-performance-skills/tar.gz/14cb046376d37d5c44cbddd22cb52a42da527ae5 audit --url http://localhost:3000 --output reports/baseline.json
-npx -y --allow-remote=all --allow-scripts=sharp https://codeload.github.com/HenryYannis/lighthouse-performance-skills/tar.gz/14cb046376d37d5c44cbddd22cb52a42da527ae5 optimize --dir ./public/assets/images
+npx -y --allow-remote=all --allow-scripts=sharp https://codeload.github.com/HenryYannis/lighthouse-performance-skills/tar.gz/9154e243ba84e832d352e1b722d658f714cd35e5 audit --url http://localhost:3000 --output reports/baseline.json
+npx -y --allow-remote=all --allow-scripts=sharp https://codeload.github.com/HenryYannis/lighthouse-performance-skills/tar.gz/9154e243ba84e832d352e1b722d658f714cd35e5 optimize --dir ./public/assets/images
 ```
 
 ---
@@ -165,8 +165,8 @@ npx -y --allow-remote=all --allow-scripts=sharp https://codeload.github.com/Henr
 将 `rules/lighthouse-performance.mdc` 复制到您项目的 `.cursor/rules/` 目录下即可。这条规则是 `alwaysApply: false`，Cursor 的 Agent 只会在任务和规则描述相关时才加载它。您也可以在 `.cursorrules` 文件中添加以下规则引用：
 ```markdown
 对于任何网页性能优化任务，请严格执行以下工作流：
-1. 运行 `npx -y --allow-remote=all --allow-scripts=sharp https://codeload.github.com/HenryYannis/lighthouse-performance-skills/tar.gz/14cb046376d37d5c44cbddd22cb52a42da527ae5 audit --url <网址> --output reports/baseline.json` 建立跑分基线。
-2. 运行 `npx -y --allow-remote=all --allow-scripts=sharp https://codeload.github.com/HenryYannis/lighthouse-performance-skills/tar.gz/14cb046376d37d5c44cbddd22cb52a42da527ae5 optimize --dir <图片目录>` 优化媒体资源。
+1. 运行 `npx -y --allow-remote=all --allow-scripts=sharp https://codeload.github.com/HenryYannis/lighthouse-performance-skills/tar.gz/9154e243ba84e832d352e1b722d658f714cd35e5 audit --url <网址> --output reports/baseline.json` 建立跑分基线。
+2. 运行 `npx -y --allow-remote=all --allow-scripts=sharp https://codeload.github.com/HenryYannis/lighthouse-performance-skills/tar.gz/9154e243ba84e832d352e1b722d658f714cd35e5 optimize --dir <图片目录>` 优化媒体资源。
 3. 执行代码级优化（延迟加载、代码分割、优化 CLS）。
 4. 重新审计并输出前后跑分对比表格。
 ```
@@ -179,7 +179,7 @@ mkdir -p ~/.claude/skills && cp -r skills/lighthouse-performance-skills ~/.claud
 # 或者只对当前项目
 mkdir -p .claude/skills && cp -r /path/to/lighthouse-performance-skills/skills/lighthouse-performance-skills .claude/skills/
 ```
-之后当您让 Claude Code 优化网页速度或提高 Lighthouse 分数时，它会根据 `SKILL.md` 里的 `description` 自动使用这个 skill，不需要每次手动让它阅读文件。只安装了 skill 文件夹时，skill 会通过 `npx -y --allow-remote=all --allow-scripts=sharp https://codeload.github.com/HenryYannis/lighthouse-performance-skills/tar.gz/14cb046376d37d5c44cbddd22cb52a42da527ae5` 调用配套脚本。
+之后当您让 Claude Code 优化网页速度或提高 Lighthouse 分数时，它会根据 `SKILL.md` 里的 `description` 自动使用这个 skill，不需要每次手动让它阅读文件。只安装了 skill 文件夹时，skill 会通过 `npx -y --allow-remote=all --allow-scripts=sharp https://codeload.github.com/HenryYannis/lighthouse-performance-skills/tar.gz/9154e243ba84e832d352e1b722d658f714cd35e5` 调用配套脚本。
 
 > **修改指令**：`SKILL.md` 是唯一来源，改完后运行 `node scripts/sync-rules.js` 重新生成 Cursor 规则。
 
