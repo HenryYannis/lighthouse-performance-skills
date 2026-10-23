@@ -14,7 +14,7 @@ English | [中文说明文档](./README_ZH.md)
 
 | Before (CLS: 0.79, Score: 75 🟡) | After (CLS: 0.054, Score: 98 🟢) |
 | :---: | :---: |
-| ![Baseline](./docs/assets/baseline.png) | ![Optimized](./docs/assets/optimized.png) |
+| ![Baseline](./docs/assets/baseline.webp) | ![Optimized](./docs/assets/optimized.webp) |
 
 ---
 
