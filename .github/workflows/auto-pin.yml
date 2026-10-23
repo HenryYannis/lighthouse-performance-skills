@@ -1,0 +1,52 @@
+name: Auto pin npx
+
+# 代码（bin、scripts、package.json、package-lock.json）推送到 main 后，
+# 自动把 README、README_ZH、SKILL.md 和 Cursor 规则里 npx 固定的提交更新为这次推送的提交。
+# 只改文档时不会触发。用 GITHUB_TOKEN 推送的提交不会再次触发工作流，不会循环。
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'bin/**'
+      - 'scripts/**'
+      - 'package.json'
+      - 'package-lock.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: auto-pin
+  cancel-in-progress: false
+
+jobs:
+  pin:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+
+      - name: Pin npx commands to this commit
+        run: node scripts/pin-npx.js "$GITHUB_SHA"
+
+      - name: Commit and push if changed
+        run: |
+          if git diff --quiet; then
+            echo "Already pinned to $GITHUB_SHA"
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898283+github-actions[bot]@users.noreply.github.com'
+          git commit -am "docs: npx 固定到 ${GITHUB_SHA::7}"
+          git pull --rebase origin main
+          git push origin HEAD:main

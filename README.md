@@ -147,7 +147,7 @@ npm run optimize -- --dir ./public/assets/images --in-place
 | `--webp-only` | Only generate modern formats, never compress the originals |
 
 #### 📦 Run Without Cloning
-Both tools are also available as a command, so they can be run from any folder. The commands are pinned to a specific commit (`…/tar.gz/9154e24…`), so `npx` always runs code you can review instead of whatever is newest on `main`. To upgrade, replace the hash with a newer commit from this repo (maintainers: after pushing, run `git fetch && npm run pin` to update every copy at once). (The commands download a tarball of that commit instead of using `github:`, because `npx` cannot fetch a `github:` spec pinned to a commit on npm 10.)
+Both tools are also available as a command, so they can be run from any folder. The commands are pinned to a specific commit (`…/tar.gz/9154e24…`), so `npx` always runs code you can review instead of whatever is newest on `main`. To upgrade, replace the hash with a newer commit from this repo (maintainers: a GitHub Actions workflow does this automatically whenever code is pushed to `main`; to do it by hand, run `git fetch && npm run pin`). (The commands download a tarball of that commit instead of using `github:`, because `npx` cannot fetch a `github:` spec pinned to a commit on npm 10.)
 ```bash
 npx -y --allow-remote=all --allow-scripts=sharp https://codeload.github.com/HenryYannis/lighthouse-performance-skills/tar.gz/9154e243ba84e832d352e1b722d658f714cd35e5 audit --url http://localhost:3000 --output reports/baseline.json
 npx -y --allow-remote=all --allow-scripts=sharp https://codeload.github.com/HenryYannis/lighthouse-performance-skills/tar.gz/9154e243ba84e832d352e1b722d658f714cd35e5 optimize --dir ./public/assets/images
