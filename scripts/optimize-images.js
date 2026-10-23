@@ -101,6 +101,17 @@ async function runOptimization() {
 
     let totalSavedBytes = 0;
     let processedCount = 0;
+    let skippedCount = 0;
+    let potentialSavedBytes = 0;   // 安全模式下：压缩原图能省多少（没有写入）
+    // 生成的现代格式：原图总大小 vs 新文件总大小
+    const modernStats = { webp: { count: 0, original: 0, output: 0 }, avif: { count: 0, original: 0, output: 0 } };
+    const recordModern = async (file, originalSize, format) => {
+      const st = await fs.stat(outputPathFor(file, `.${format}`)).catch(() => null);
+      if (!st) return;
+      modernStats[format].count++;
+      modernStats[format].original += originalSize;
+      modernStats[format].output += st.size;
+    };
 
     for (const file of imageFiles) {
       const ext = path.extname(file).toLowerCase();
@@ -115,6 +126,7 @@ async function runOptimization() {
 
       if (inPlace && !force && manifest[rel] && manifest[rel].size === originalSize) {
         console.log(`⏩ Skipping (already optimized, see ${MANIFEST_NAME}): ${rel}`);
+        skippedCount++;
         continue;
       }
 
@@ -122,9 +134,12 @@ async function runOptimization() {
 
       // 1. Generate modern formats (highly recommended for web performance)
       await generateModern(file, originalSize, 'webp');
+      await recordModern(file, originalSize, 'webp');
       if (generateAvif) {
         await generateModern(file, originalSize, 'avif');
+        await recordModern(file, originalSize, 'avif');
       }
+      if (convertToWebpOnly) processedCount++;
 
       // 2. Compress the original format unless --webp-only is specified
       if (!convertToWebpOnly) {
@@ -165,6 +180,7 @@ async function runOptimization() {
             } else {
               await fs.remove(tempOutPath);
               console.log(`   └─ 💡 Compression could save: ${savedMsg} (original untouched)`);
+              potentialSavedBytes += saved;
             }
           } else {
             await fs.remove(tempOutPath);
@@ -187,7 +203,26 @@ async function runOptimization() {
     console.log('📊 IMAGE OPTIMIZATION SUMMARY');
     console.log('======================================================');
     console.log(`Images processed:  ${processedCount}`);
-    console.log(`Total Space Saved: ${formatBytes(totalSavedBytes)}`);
+    if (skippedCount) console.log(`Skipped:           ${skippedCount} (already optimized, see ${MANIFEST_NAME})`);
+    for (const [format, st] of Object.entries(modernStats)) {
+      if (format === 'avif' && !generateAvif) continue;
+      if (st.count === 0) {
+        console.log(`${format.toUpperCase()} generated:    0`);
+        continue;
+      }
+      const pct = ((st.original - st.output) / st.original * 100).toFixed(1);
+      console.log(`${format.toUpperCase()} generated:    ${st.count} file(s), ${formatBytes(st.original)} -> ${formatBytes(st.output)} [Saved ${formatBytes(st.original - st.output)}, ${pct}% vs originals]`);
+    }
+    if (convertToWebpOnly) {
+      console.log('Originals:         not compressed (--webp-only)');
+    } else if (inPlace) {
+      console.log(`Originals:         compressed in place, saved ${formatBytes(totalSavedBytes)} (backups: *.orig)`);
+    } else if (outDir) {
+      console.log(`Originals:         compressed copies in ${outDir}, saved ${formatBytes(totalSavedBytes)}; originals untouched`);
+    } else {
+      console.log(`Originals:         untouched (safe mode); compressing them could save ${formatBytes(potentialSavedBytes)}`);
+      console.log('                   use --out <dir> or --in-place to keep compressed copies');
+    }
     console.log('======================================================\n');
 
   } catch (err) {
