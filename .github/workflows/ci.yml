@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  smoke-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # 起一个静态服务器托管 example，跑一次完整 audit
+      - name: Audit example page
+        run: |
+          python3 -m http.server 8080 -d example > /dev/null 2>&1 &
+          sleep 2
+          npm run audit -- --url http://localhost:8080 --output reports/ci/report.json
+          test -s reports/ci/report.json
+          test -s reports/ci/report.html
+          test -s reports/ci/report.md
+
+      # 在副本上跑图片优化，不动仓库里的示例图
+      - name: Optimize images (on a copy)
+        run: |
+          cp -r example/images "$RUNNER_TEMP/images"
+          npm run optimize -- --dir "$RUNNER_TEMP/images" --quality 80
+          ls -la "$RUNNER_TEMP/images"
+          test -s "$RUNNER_TEMP/images/large-photo.webp"
