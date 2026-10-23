@@ -15,7 +15,7 @@
     "agent-skill",
     "optimize"
   ],
-  "author": "",
+  "author": "Henry Yannis",
   "license": "MIT",
   "dependencies": {
     "chrome-launcher": "^1.1.1",
