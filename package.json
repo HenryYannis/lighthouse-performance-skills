@@ -15,7 +15,7 @@
     "agent-skill",
     "optimize"
   ],
-  "author": "",
+  "author": "程小宝 (Cheng Xiaobao - xbkjz.cn)",
   "license": "MIT",
   "dependencies": {
     "chrome-launcher": "^1.1.1",
