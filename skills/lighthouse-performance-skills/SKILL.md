@@ -20,9 +20,10 @@ This skill guides you through the process of diagnosing web application performa
 ### Step 1: Establish a Baseline Audit (性能诊断)
 Before making any performance modifications, run a diagnostic audit to establish a baseline.
 
-1. **Locate the Helper Scripts**: The commands below run from the **user's project root**, but the helper scripts live in the `lighthouse-performance-skills` repository root (the folder that contains `package.json` and `scripts/`, i.e. `../..` from the folder this `SKILL.md` is in). Use that path in every command, written below as `<skill-repo>`:
-   - If `<skill-repo>/node_modules` does not exist, run `npm install` inside `<skill-repo>` first.
-   - If only this `SKILL.md` is installed (no `scripts/` folder nearby), call the published CLI instead: replace `node <skill-repo>/scripts/run-lighthouse.js` with `npx -y github:HenryYannis/lighthouse-performance-skills audit`, and `node <skill-repo>/scripts/optimize-images.js` with `npx -y github:HenryYannis/lighthouse-performance-skills optimize`.
+1. **Locate the Helper Scripts**: The commands below run from the **user's project root**, but the helper scripts live in the `lighthouse-performance-skills` repository root, written below as `<skill-repo>`. Find it like this, and do not guess:
+   - A folder counts as `<skill-repo>` only if its `package.json` has `"name": "lighthouse-performance-skills"` **and** it contains `scripts/run-lighthouse.js`. Usually it is `../..` from the folder this file is in, but check; when this file was copied into another project (for example as a Cursor rule in `.cursor/rules/`), `../..` is the user's own project and does not count.
+   - If you found `<skill-repo>` and `<skill-repo>/node_modules` does not exist, run `npm install` inside `<skill-repo>` first. Never run `npm install` in any other folder for this skill.
+   - If you cannot find a folder that passes the check, or you do not know where this file lives, call the pinned CLI instead: replace `node <skill-repo>/scripts/run-lighthouse.js` with `npx -y --allow-remote=all --allow-scripts=sharp https://codeload.github.com/HenryYannis/lighthouse-performance-skills/tar.gz/14cb046376d37d5c44cbddd22cb52a42da527ae5 audit`, and `node <skill-repo>/scripts/optimize-images.js` with `npx -y --allow-remote=all --allow-scripts=sharp https://codeload.github.com/HenryYannis/lighthouse-performance-skills/tar.gz/14cb046376d37d5c44cbddd22cb52a42da527ae5 optimize`.
 2. **Verify Dev Server**: Ensure the local development server (or production build server) is running.
 3. **Run Lighthouse Script**: Run a headless Chrome audit on the target URL. It runs 3 times by default and keeps the median run, because a single run can swing by ±5 points. Add `--preset desktop` to audit as desktop (default is mobile):
    ```bash
@@ -54,7 +55,7 @@ node <skill-repo>/scripts/optimize-images.js --dir ./public/assets/images --qual
   </picture>
   ```
 - **Lazy Loading**: Ensure all offscreen images have `loading="lazy"`.
-- **Eager Loading for LCP**: If an image is the Largest Contentful Paint element (e.g., hero image), **do not** lazy load it. Instead, use `fetchpriority="high"` and preconnect/preload the resource.
+- **Eager Loading for LCP**: If an image is the Largest Contentful Paint element (e.g., hero image), **do not** lazy load it. Instead, use `fetchpriority="high"` on the `<img>`. Add `<link rel="preload" as="image" fetchpriority="high">` only when the image is not in the initial HTML (e.g. a CSS background or rendered by JS), and `<link rel="preconnect">` only when it is served from another origin.
 
 #### 2. Layout Shift (CLS) Prevention
 - Always specify `width` and `height` dimensions on `<img>` and `<video>` tags, or reserve space with CSS Aspect Ratio:
@@ -76,7 +77,8 @@ node <skill-repo>/scripts/optimize-images.js --dir ./public/assets/images --qual
   <link rel="preload" href="styles.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
   <noscript><link rel="stylesheet" href="styles.css"></noscript>
   ```
-- **JS**: Move non-critical scripts to the bottom of the body, or load them using `defer` or `async`:
+  The inline `onload` is blocked by a strict Content Security Policy (no `'unsafe-inline'` / `'unsafe-hashes'` for scripts). If the site has one, switch the `rel` from an external script instead, or use `<link rel="stylesheet" href="styles.css" media="print">` plus a script that sets `media="all"` after load.
+- **JS**: Move non-critical scripts to the bottom of the body, or load them using `defer` (keeps execution order, runs after parsing) or `async` (runs as soon as it downloads, in any order; only for independent scripts such as analytics):
   ```html
   <script src="app.js" defer></script>
   ```
@@ -88,7 +90,7 @@ For large single-page applications, split bundles dynamically:
 
 #### 3. Font Optimization
 - Add `font-display: swap` to `@font-face` rules to prevent Invisible Text (FOIT) during load.
-- Preconnect to font domains:
+- Only if the page loads fonts from Google Fonts, preconnect to its domains (skip this for self-hosted fonts):
   ```html
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
