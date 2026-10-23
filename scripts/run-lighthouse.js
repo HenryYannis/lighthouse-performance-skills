@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import fs from 'fs-extra';
+import fs from 'fs/promises';
 import path from 'path';
 import lighthouse from 'lighthouse';
 import * as chromeLauncher from 'chrome-launcher';
@@ -66,7 +66,7 @@ async function runAudit() {
 
   try {
     // Ensure output directory exists
-    await fs.ensureDir(path.dirname(jsonPath));
+    await fs.mkdir(path.dirname(jsonPath), { recursive: true });
 
     console.log('🌐 Launching headless Chrome...');
     chrome = await chromeLauncher.launch({
@@ -99,7 +99,7 @@ async function runAudit() {
     }
     
     // Write full JSON report
-    await fs.writeJson(jsonPath, runnerResult.lhr, { spaces: 2 });
+    await fs.writeFile(jsonPath, JSON.stringify(runnerResult.lhr, null, 2) + '\n');
     console.log(`✅ Detailed JSON report written to: ${jsonPath}`);
 
     // Write HTML report
