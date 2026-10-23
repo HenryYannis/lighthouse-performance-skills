@@ -32,7 +32,7 @@ With the rise of AI coding assistants like Cursor and Claude Code, we are delega
 ## ✨ Features
 
 - 📊 **Headless Auditing**: Integrated `Lighthouse` engine that launches headless Chrome to audit local or remote pages, generating standard markdown reports highlighting LCP, CLS, and TBT.
-- 🖼️ **Asset Optimization**: Uses the powerful `sharp` library to compress images losslessly/lossily and generate modern WebP files while preserving visual excellence.
+- 🖼️ **Asset Optimization**: Uses the `sharp` library to generate WebP (and optionally AVIF) versions of your images. Originals are never touched unless you ask for it (`--out` for a separate folder, `--in-place` with `.orig` backups). JPEGs are compressed lossily with mozjpeg; PNGs are lossless by default.
 - 🤖 **Agent-First Native Integration**: Built-in `SKILL.md` format tailored for AI context windows and custom rules.
 - 📈 **Closed-Loop Verification**: Directs agents to benchmark baselines, optimize step-by-step, and re-run audits to generate before-and-after comparison metrics.
 
@@ -44,15 +44,18 @@ With the rise of AI coding assistants like Cursor and Claude Code, we are delega
 lighthouse-performance-skills/
 ├── skills/
 │   └── lighthouse-performance-skills/
-│       └── SKILL.md          # Open Plugins format instruction set for agents
+│       └── SKILL.md          # Agent Skill instruction set (single source of truth)
 ├── rules/
-│   └── lighthouse-performance.mdc # Cursor MDC rules format instructions
+│   └── lighthouse-performance.mdc # Cursor rule, generated from SKILL.md
+├── bin/
+│   └── cli.js                # `lighthouse-performance-skills audit|optimize` command
 ├── package.json              # Project dependencies and run commands
 ├── README.md                 # English documentation (This file)
 ├── README_ZH.md              # Chinese documentation
 └── scripts/
     ├── run-lighthouse.js     # Script to launch headless Chrome and run audit
-    └── optimize-images.js    # Script to optimize images & compile WebP
+    ├── optimize-images.js    # Script to optimize images & generate WebP/AVIF
+    └── sync-rules.js         # Regenerates the Cursor rule from SKILL.md
 ```
 
 ---
@@ -68,7 +71,7 @@ cd lighthouse-performance-skills
 npm install
 ```
 
-> **Note**: Running the Lighthouse audit script requires **Google Chrome** or **Chromium** browser to be installed on your operating system.
+> **Note**: Requires **Node.js 22.19+** (required by Lighthouse 13), and **Google Chrome** or **Chromium** installed on your operating system for the audit script.
 
 ### 🛠️ Troubleshooting (Sharp Installation issues)
 
@@ -95,7 +98,7 @@ You can instantly test the audit and optimization workflow on the included `/exa
    npm run audit -- --url http://localhost:8080 --output reports/demo-report.json
    ```
    *This will output `reports/demo-report.json`, `reports/demo-report.md`, and an interactive `reports/demo-report.html`.*
-3. Optimize the large demo image:
+3. Optimize the large demo image (creates `large-photo.webp` next to it; the original JPG is left untouched):
    ```bash
    npm run optimize -- --dir ./example/images --quality 80
    ```
@@ -109,12 +112,43 @@ While these tools are optimized for AI automation, you can run them directly:
 # Audit a dev server or live URL
 npm run audit -- --url http://localhost:3000 --output reports/baseline.json
 ```
-This prints a summary dashboard in the console and saves a full `baseline.json` report along with a `baseline.md` markdown summary inside the `reports/` directory.
+This prints a summary dashboard in the console and saves `baseline.json` (full report), `baseline.html` (interactive report) and `baseline.md` (markdown summary) inside the `reports/` directory.
+
+| Option | Default | Description |
+| :--- | :--- | :--- |
+| `--url` | `https://example.com` | Page to audit |
+| `--output` | `reports/performance-report.json` | Report path; `.json`/`.html`/`.md` are written side by side (the extension is optional) |
+| `--runs` | `3` | Number of runs; the median run is reported, since a single run can swing by ±5 points |
+| `--preset` | `mobile` | `mobile` or `desktop` |
 
 #### 🖼️ Optimize Local Images
 ```bash
-# Compress images and compile WebP alternatives
+# Generate WebP alternatives next to the originals (originals untouched)
 npm run optimize -- --dir ./public/assets/images --quality 80
+
+# Also write compressed copies of the originals to a separate folder
+npm run optimize -- --dir ./public/assets/images --out ./public/assets/images-optimized
+
+# Overwrite the originals (keeps a .orig backup, skips already-processed files next time)
+npm run optimize -- --dir ./public/assets/images --in-place
+```
+
+| Option | Description |
+| :--- | :--- |
+| `--dir` | Image folder to scan (default `./images`) |
+| `--quality` | Quality for lossy output, default `80` |
+| `--out <dir>` | Write compressed originals and WebP/AVIF to this folder, mirroring the structure |
+| `--in-place` | Overwrite the originals, after backing each one up as `<file>.orig` |
+| `--force` | With `--in-place`, re-process files already listed in `.optimize-images-manifest.json` |
+| `--avif` | Also generate AVIF |
+| `--png-palette` | Quantize PNGs to 256 colors (lossy); PNGs are lossless by default |
+| `--webp-only` | Only generate modern formats, never compress the originals |
+
+#### 📦 Run Without Cloning
+Both tools are also available as a command, so they can be run from any folder:
+```bash
+npx -y github:HenryYannis/lighthouse-performance-skills audit --url http://localhost:3000 --output reports/baseline.json
+npx -y github:HenryYannis/lighthouse-performance-skills optimize --dir ./public/assets/images
 ```
 
 ---
@@ -125,20 +159,26 @@ npm run optimize -- --dir ./public/assets/images --quality 80
 Keep the skill directory in your workspace. When asking Antigravity to "optimize loading speeds" or "raise the Lighthouse score", the agent will read and execute the instructions in `skills/lighthouse-performance-skills/SKILL.md` automatically.
 
 ### 2. In Cursor (.cursorrules & .mdc)
-Because this repository conforms to the Open Plugins standard, Cursor can auto-detect the rule `rules/lighthouse-performance.mdc` when submitted to the registry. Alternatively, you can copy the contents of `rules/lighthouse-performance.mdc` to `.cursor/rules/lighthouse-performance.mdc` in your local project, or reference the workflow in your `.cursorrules`:
+Copy `rules/lighthouse-performance.mdc` to `.cursor/rules/lighthouse-performance.mdc` in your project. The rule uses `alwaysApply: false`, so Cursor's agent loads it only when a task matches its description. Alternatively, reference the workflow in your `.cursorrules`:
 ```markdown
 For any web performance optimization tasks, follow the workflow defined in:
-1. Run `node scripts/run-lighthouse.js` to establish a baseline.
-2. Run `node scripts/optimize-images.js` to optimize images.
+1. Run `npx -y github:HenryYannis/lighthouse-performance-skills audit --url <url> --output reports/baseline.json` to establish a baseline.
+2. Run `npx -y github:HenryYannis/lighthouse-performance-skills optimize --dir <image folder>` to optimize images.
 3. Perform source code optimizations (defer scripts, lazy load, fix CLS dimensions).
 4. Run audit again to verify improvements and render a before/after comparison table.
 ```
 
 ### 3. In Claude Code
-You can pass the skill file as context when interacting with Claude:
+Install the skill folder as a Claude Code skill, either for all projects or for one project:
 ```bash
-claude "Read skills/lighthouse-performance-skills/SKILL.md and optimize the landing page performance"
+# All projects
+mkdir -p ~/.claude/skills && cp -r skills/lighthouse-performance-skills ~/.claude/skills/
+# Or only the current project
+mkdir -p .claude/skills && cp -r /path/to/lighthouse-performance-skills/skills/lighthouse-performance-skills .claude/skills/
 ```
+Claude Code picks the skill up automatically from the `description` in `SKILL.md` when you ask it to speed up a page or raise the Lighthouse score; there is no need to tell it to read the file each time. When only the skill folder is installed, the skill runs the helper scripts through `npx -y github:HenryYannis/lighthouse-performance-skills`.
+
+> **Editing the instructions**: `SKILL.md` is the single source. After changing it, run `node scripts/sync-rules.js` to regenerate the Cursor rule.
 
 ---
 

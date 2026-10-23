@@ -32,7 +32,7 @@
 ## ✨ 核心特性
 
 - 📊 **一键无头审计**：集成 `Lighthouse` 引擎，自动启动 Headless Chrome 运行审计，生成包含关键指标（LCP, CLS, TBT）的 Markdown 简报。
-- 🖼️ **智能图像优化**：利用 `sharp` 库进行高质量的图片有损/无损压缩，并全自动生成 WebP 格式，保留 UI 极致的高级感。
+- 🖼️ **智能图像优化**：利用 `sharp` 库生成 WebP（可选 AVIF）格式。默认不动原图，只有明确要求时才处理原图（`--out` 输出到单独目录，或 `--in-place` 覆盖并保留 `.orig` 备份）。JPEG 用 mozjpeg 有损压缩，PNG 默认无损。
 - 🤖 **Agent 原生友好**：内置专为 AI 设计的 `SKILL.md` 指令，适配主流 AI 编辑器的自定义规则系统。
 - 📈 **闭环验证**：指导 AI 建立“审计基线 -> 实施优化 -> 二次审计对比”的闭环，确保优化效果通过数据说话。
 
@@ -44,15 +44,18 @@
 lighthouse-performance-skills/
 ├── skills/
 │   └── lighthouse-performance-skills/
-│       └── SKILL.md          # 遵循 Open Plugins 规范的 Agent 指令文件
+│       └── SKILL.md          # Agent Skill 指令文件（唯一来源）
 ├── rules/
-│   └── lighthouse-performance.mdc # 遵循 Cursor MDC 规范的指令文件
+│   └── lighthouse-performance.mdc # Cursor 规则，由 SKILL.md 自动生成
+├── bin/
+│   └── cli.js                # `lighthouse-performance-skills audit|optimize` 命令入口
 ├── package.json              # 项目依赖与运行脚本
 ├── README.md                 # 项目介绍 (英文)
 ├── README_ZH.md              # 项目介绍 (中文)
 └── scripts/
     ├── run-lighthouse.js     # 用于审计本地/远程网页性能的脚本
-    └── optimize-images.js    # 自动执行图像转换与优化的脚本
+    ├── optimize-images.js    # 生成 WebP/AVIF、压缩图片的脚本
+    └── sync-rules.js         # 从 SKILL.md 重新生成 Cursor 规则
 ```
 
 ---
@@ -68,7 +71,7 @@ cd lighthouse-performance-skills
 npm install
 ```
 
-> **注意**：运行 Lighthouse 审计脚本需要系统已安装 **Google Chrome** 或 **Chromium** 浏览器。
+> **注意**：需要 **Node.js 22.19+**（Lighthouse 13 的要求）；运行审计脚本还需要系统已安装 **Google Chrome** 或 **Chromium** 浏览器。
 
 ### 🛠️ 常见问题（Sharp 库安装失败提示）
 
@@ -95,7 +98,7 @@ npm approve-scripts sharp
    npm run audit -- --url http://localhost:8080 --output reports/demo-report.json
    ```
    *这将在 `reports/` 目录下导出 `demo-report.json`、`demo-report.md` 简报以及可在浏览器中直接打开的交互式 `demo-report.html`。*
-3. 一键优化 Demo 中未压缩的大图：
+3. 一键优化 Demo 中未压缩的大图（会在旁边生成 `large-photo.webp`，原 JPG 不动）：
    ```bash
    npm run optimize -- --dir ./example/images --quality 80
    ```
@@ -109,12 +112,43 @@ npm approve-scripts sharp
 # 对本地开发服务器或在线网站运行性能审计
 npm run audit -- --url http://localhost:3000 --output reports/baseline.json
 ```
-运行后会在控制台打印漂亮的跑分摘要，并在 `reports/` 目录下生成 `baseline.json`（详细数据）和 `baseline.md`（Markdown版简报）。
+运行后会在控制台打印漂亮的跑分摘要，并在 `reports/` 目录下生成 `baseline.json`（详细数据）、`baseline.html`（交互式报告）和 `baseline.md`（Markdown 版简报）。
+
+| 参数 | 默认值 | 说明 |
+| :--- | :--- | :--- |
+| `--url` | `https://example.com` | 要审计的网页 |
+| `--output` | `reports/performance-report.json` | 报告路径，`.json`/`.html`/`.md` 会并排生成（扩展名可省略） |
+| `--runs` | `3` | 运行次数，取中位数那一次；单次跑分常有 ±5 分波动 |
+| `--preset` | `mobile` | `mobile` 或 `desktop` |
 
 #### 🖼️ 批量优化图片
 ```bash
-# 扫描指定目录下的图片，进行压缩并自动生成对应的 .webp 格式
+# 在原图旁边生成 .webp（原图不动）
 npm run optimize -- --dir ./public/assets/images --quality 80
+
+# 同时把压缩后的原格式图片写到单独目录
+npm run optimize -- --dir ./public/assets/images --out ./public/assets/images-optimized
+
+# 直接覆盖原图（先备份成 .orig，下次运行会跳过已处理的文件）
+npm run optimize -- --dir ./public/assets/images --in-place
+```
+
+| 参数 | 说明 |
+| :--- | :--- |
+| `--dir` | 要扫描的图片目录（默认 `./images`） |
+| `--quality` | 有损压缩质量，默认 `80` |
+| `--out <dir>` | 把压缩后的原格式和 WebP/AVIF 按原目录结构写到这个目录 |
+| `--in-place` | 覆盖原图，覆盖前把每个文件备份成 `<文件名>.orig` |
+| `--force` | 配合 `--in-place`，重新处理 `.optimize-images-manifest.json` 里已记录的文件 |
+| `--avif` | 同时生成 AVIF |
+| `--png-palette` | 把 PNG 量化成 256 色（有损）；PNG 默认无损 |
+| `--webp-only` | 只生成现代格式，不压缩原图 |
+
+#### 📦 不克隆也能用
+两个工具都可以作为命令在任何目录下运行：
+```bash
+npx -y github:HenryYannis/lighthouse-performance-skills audit --url http://localhost:3000 --output reports/baseline.json
+npx -y github:HenryYannis/lighthouse-performance-skills optimize --dir ./public/assets/images
 ```
 
 ---
@@ -125,20 +159,26 @@ npm run optimize -- --dir ./public/assets/images --quality 80
 将该目录放入您的项目根目录中。当您对 Antigravity 提出类似“优化我们网站的加载速度”或“提高 Lighthouse 分数”的要求时，Antigravity 会自动读取并执行 `skills/lighthouse-performance-skills/SKILL.md` 中定义的标准步骤。
 
 ### 2. 在 Cursor 中使用 (.cursorrules & .mdc)
-由于本项目完全遵循 Open Plugins 标准，当您将仓库提交到插件目录后，Cursor 会自动识别并注册 `rules/lighthouse-performance.mdc` 规则。您也可以直接将 `rules/lighthouse-performance.mdc` 复制到本地项目的 `.cursor/rules/` 目录下，或在您的 `.cursorrules` 文件中添加以下规则引用：
+将 `rules/lighthouse-performance.mdc` 复制到您项目的 `.cursor/rules/` 目录下即可。这条规则是 `alwaysApply: false`，Cursor 的 Agent 只会在任务和规则描述相关时才加载它。您也可以在 `.cursorrules` 文件中添加以下规则引用：
 ```markdown
 对于任何网页性能优化任务，请严格执行以下工作流：
-1. 运行 `node scripts/run-lighthouse.js` 建立跑分基线。
-2. 运行 `node scripts/optimize-images.js` 优化媒体资源。
+1. 运行 `npx -y github:HenryYannis/lighthouse-performance-skills audit --url <网址> --output reports/baseline.json` 建立跑分基线。
+2. 运行 `npx -y github:HenryYannis/lighthouse-performance-skills optimize --dir <图片目录>` 优化媒体资源。
 3. 执行代码级优化（延迟加载、代码分割、优化 CLS）。
 4. 重新审计并输出前后跑分对比表格。
 ```
 
 ### 3. 在 Claude Code 中使用
-在与 Claude CLI 交互时，您可以直接将本项目的 `skills/lighthouse-performance-skills/SKILL.md` 作为上下文输入：
+把 skill 文件夹安装成 Claude Code 的 skill，可以对所有项目生效，也可以只对单个项目生效：
 ```bash
-claude "阅读 skills/lighthouse-performance-skills/SKILL.md，并帮我优化当前项目的性能"
+# 所有项目
+mkdir -p ~/.claude/skills && cp -r skills/lighthouse-performance-skills ~/.claude/skills/
+# 或者只对当前项目
+mkdir -p .claude/skills && cp -r /path/to/lighthouse-performance-skills/skills/lighthouse-performance-skills .claude/skills/
 ```
+之后当您让 Claude Code 优化网页速度或提高 Lighthouse 分数时，它会根据 `SKILL.md` 里的 `description` 自动使用这个 skill，不需要每次手动让它阅读文件。只安装了 skill 文件夹时，skill 会通过 `npx -y github:HenryYannis/lighthouse-performance-skills` 调用配套脚本。
+
+> **修改指令**：`SKILL.md` 是唯一来源，改完后运行 `node scripts/sync-rules.js` 重新生成 Cursor 规则。
 
 ---
 
