@@ -4,6 +4,8 @@ import fs from 'fs-extra';
 import path from 'path';
 import lighthouse from 'lighthouse';
 import * as chromeLauncher from 'chrome-launcher';
+import desktopConfig from 'lighthouse/core/config/desktop-config.js';
+import {computeMedianRun} from 'lighthouse/core/lib/median-run.js';
 
 // Parse arguments
 const args = process.argv.slice(2);
@@ -14,9 +16,21 @@ const getArg = (flag) => {
 
 const url = getArg('--url') || 'https://example.com';
 const outputPath = getArg('--output') || 'reports/performance-report.json';
+// 单次跑分常有 ±5 分波动，默认跑 3 次取中位数
+const runs = parseInt(getArg('--runs') || '3', 10);
+const preset = (getArg('--preset') || 'mobile').toLowerCase();
+
+// 不管 --output 写的是 reports/baseline 还是 reports/baseline.json，
+// 都统一拼成 baseline.json / baseline.html / baseline.md，避免互相覆盖
+const parsedOutput = path.parse(outputPath);
+const outputBase = path.join(parsedOutput.dir, ['.json', '.html', '.md'].includes(parsedOutput.ext.toLowerCase()) ? parsedOutput.name : parsedOutput.base);
+const jsonPath = `${outputBase}.json`;
+const htmlPath = `${outputBase}.html`;
+const mdPath = `${outputBase}.md`;
 
 console.log(`\n======================================================`);
 console.log(`⚡ Starting Lighthouse Audit for: ${url}`);
+console.log(`📱 Preset: ${preset} | Runs: ${runs}`);
 console.log(`======================================================\n`);
 
 async function runAudit() {
@@ -41,13 +55,22 @@ async function runAudit() {
     process.exit(1);
   }
 
+  if (!Number.isInteger(runs) || runs < 1) {
+    console.error(`❌ Invalid --runs value. Please provide a positive integer.`);
+    process.exit(1);
+  }
+  if (!['mobile', 'desktop'].includes(preset)) {
+    console.error(`❌ Invalid --preset "${preset}". Use "mobile" or "desktop".`);
+    process.exit(1);
+  }
+
   try {
     // Ensure output directory exists
-    await fs.ensureDir(path.dirname(outputPath));
+    await fs.ensureDir(path.dirname(jsonPath));
 
     console.log('🌐 Launching headless Chrome...');
     chrome = await chromeLauncher.launch({
-      chromeFlags: ['--headless', '--disable-gpu', '--no-sandbox']
+      chromeFlags: ['--headless=new', '--disable-gpu', '--no-sandbox']
     });
 
     console.log(`🚦 Running audit on port ${chrome.port}...`);
@@ -58,15 +81,28 @@ async function runAudit() {
       port: chrome.port,
     };
 
-    const runnerResult = await lighthouse(url, options);
-    const [jsonReport, htmlReport] = runnerResult.report;
+    const config = preset === 'desktop' ? desktopConfig : undefined;
+    const results = [];
+    for (let i = 1; i <= runs; i++) {
+      const result = await lighthouse(url, options, config);
+      const perf = result.lhr.categories.performance.score * 100;
+      console.log(`   Run ${i}/${runs}: Performance ${perf.toFixed(0)}`);
+      results.push(result);
+    }
+
+    // 取中位数那一次（Lighthouse 官方的 computeMedianRun）作为最终报告
+    const medianLhr = runs > 1 ? computeMedianRun(results.map((r) => r.lhr)) : results[0].lhr;
+    const runnerResult = results.find((r) => r.lhr === medianLhr) || results[0];
+    const [, htmlReport] = runnerResult.report;
+    if (runs > 1) {
+      console.log(`📌 Using the median run (Performance ${(runnerResult.lhr.categories.performance.score * 100).toFixed(0)})`);
+    }
     
     // Write full JSON report
-    await fs.writeJson(outputPath, runnerResult.lhr, { spaces: 2 });
-    console.log(`✅ Detailed JSON report written to: ${outputPath}`);
+    await fs.writeJson(jsonPath, runnerResult.lhr, { spaces: 2 });
+    console.log(`✅ Detailed JSON report written to: ${jsonPath}`);
 
     // Write HTML report
-    const htmlPath = outputPath.replace('.json', '.html');
     await fs.writeFile(htmlPath, htmlReport);
     console.log(`✅ Interactive HTML report written to: ${htmlPath}`);
 
@@ -105,7 +141,6 @@ async function runAudit() {
     console.log('======================================================\n');
 
     // Create a markdown summary file
-    const mdPath = outputPath.replace('.json', '.md');
     const mdReport = generateMarkdownSummary(url, scores, metrics, runnerResult.lhr);
     await fs.writeFile(mdPath, mdReport);
     console.log(`📝 Markdown summary report written to: ${mdPath}`);
@@ -155,6 +190,7 @@ function generateMarkdownSummary(targetUrl, scores, metrics, lhr) {
   return `# Lighthouse Audit Report for ${targetUrl}
 
 Date: ${new Date().toLocaleString()}
+Preset: ${preset} | Runs: ${runs} (median run shown)
 
 ## 📊 Category Scores
 | Category | Score | Status |
