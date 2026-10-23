@@ -32,7 +32,7 @@
 ## ✨ 核心特性
 
 - 📊 **一键无头审计**：集成 `Lighthouse` 引擎，自动启动 Headless Chrome 运行审计，生成包含关键指标（LCP, CLS, TBT）的 Markdown 简报。
-- 🖼️ **智能图像优化**：利用 `sharp` 库生成 WebP（可选 AVIF）格式。默认不动原图，只有明确要求时才处理原图（`--out` 输出到单独目录，或 `--in-place` 覆盖并保留 `.orig` 备份）。JPEG 用 mozjpeg 有损压缩，PNG 默认无损。
+- 🖼️ **智能图像优化**：利用 `sharp` 库生成 WebP（可选 AVIF）格式。默认不动原图，也不动已存在的 `.webp`/`.avif`，只有明确要求时才处理（`--out` 输出到单独目录，`--in-place` 覆盖并保留 `.orig` 备份，`--force` 覆盖已有的 WebP/AVIF）。JPEG 用 mozjpeg 有损压缩，PNG 默认无损。
 - 🤖 **Agent 原生友好**：内置专为 AI 设计的 `SKILL.md` 指令，适配主流 AI 编辑器的自定义规则系统。
 - 📈 **闭环验证**：指导 AI 建立“审计基线 -> 实施优化 -> 二次审计对比”的闭环，确保优化效果通过数据说话。
 
@@ -138,8 +138,8 @@ npm run optimize -- --dir ./public/assets/images --in-place
 | `--dir` | 要扫描的图片目录（默认 `./images`） |
 | `--quality` | 有损压缩质量，默认 `80` |
 | `--out <dir>` | 把压缩后的原格式和 WebP/AVIF 按原目录结构写到这个目录 |
-| `--in-place` | 覆盖原图，覆盖前把每个文件备份成 `<文件名>.orig` |
-| `--force` | 配合 `--in-place`，重新处理 `.optimize-images-manifest.json` 里已记录的文件 |
+| `--in-place` | 覆盖原图，覆盖前把每个文件备份成 `<文件名>.orig`（中途换了新图会另存为 `.orig.2`、`.orig.3`……，旧备份绝不覆盖） |
+| `--force` | 覆盖已存在的 `.webp`/`.avif`（默认保留不动）；配合 `--in-place` 时重新处理 `.optimize-images-manifest.json` 里已记录的文件 |
 | `--avif` | 同时生成 AVIF |
 | `--png-palette` | 把 PNG 量化成 256 色（有损）；PNG 默认无损 |
 | `--webp-only` | 只生成现代格式，不压缩原图 |

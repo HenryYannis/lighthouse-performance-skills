@@ -32,7 +32,7 @@ With the rise of AI coding assistants like Cursor and Claude Code, we are delega
 ## ✨ Features
 
 - 📊 **Headless Auditing**: Integrated `Lighthouse` engine that launches headless Chrome to audit local or remote pages, generating standard markdown reports highlighting LCP, CLS, and TBT.
-- 🖼️ **Asset Optimization**: Uses the `sharp` library to generate WebP (and optionally AVIF) versions of your images. Originals are never touched unless you ask for it (`--out` for a separate folder, `--in-place` with `.orig` backups). JPEGs are compressed lossily with mozjpeg; PNGs are lossless by default.
+- 🖼️ **Asset Optimization**: Uses the `sharp` library to generate WebP (and optionally AVIF) versions of your images. Originals and existing `.webp`/`.avif` files are never touched unless you ask for it (`--out` for a separate folder, `--in-place` with `.orig` backups, `--force` to overwrite existing WebP/AVIF). JPEGs are compressed lossily with mozjpeg; PNGs are lossless by default.
 - 🤖 **Agent-First Native Integration**: Built-in `SKILL.md` format tailored for AI context windows and custom rules.
 - 📈 **Closed-Loop Verification**: Directs agents to benchmark baselines, optimize step-by-step, and re-run audits to generate before-and-after comparison metrics.
 
@@ -138,8 +138,8 @@ npm run optimize -- --dir ./public/assets/images --in-place
 | `--dir` | Image folder to scan (default `./images`) |
 | `--quality` | Quality for lossy output, default `80` |
 | `--out <dir>` | Write compressed originals and WebP/AVIF to this folder, mirroring the structure |
-| `--in-place` | Overwrite the originals, after backing each one up as `<file>.orig` |
-| `--force` | With `--in-place`, re-process files already listed in `.optimize-images-manifest.json` |
+| `--in-place` | Overwrite the originals, after backing each one up as `<file>.orig` (a replaced image gets `<file>.orig.2`, `.orig.3`…; old backups are never overwritten) |
+| `--force` | Overwrite existing `.webp`/`.avif` files (kept by default), and with `--in-place` re-process files already listed in `.optimize-images-manifest.json` |
 | `--avif` | Also generate AVIF |
 | `--png-palette` | Quantize PNGs to 256 colors (lossy); PNGs are lossless by default |
 | `--webp-only` | Only generate modern formats, never compress the originals |

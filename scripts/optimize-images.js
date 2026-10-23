@@ -28,7 +28,7 @@ const targetDir = getArg('--dir') || './images';
 const quality = parseInt(getArg('--quality') || '80', 10);
 const outDir = getArg('--out');                     // 输出到单独目录，原图不动
 const inPlace = args.includes('--in-place');        // 明确要求才覆盖原图（会先备份 .orig）
-const force = args.includes('--force');             // 忽略 manifest，重新处理
+const force = args.includes('--force');             // 忽略 manifest 重新处理；覆盖已存在的 .webp/.avif
 const convertToWebpOnly = args.includes('--webp-only');
 const generateAvif = args.includes('--avif');
 const pngPalette = args.includes('--png-palette');  // PNG 默认无损，加这个才量化成 256 色
@@ -70,22 +70,61 @@ function outputPathFor(file, newExt) {
   return newExt ? base.substring(0, base.lastIndexOf('.')) + newExt : base;
 }
 
-// 生成 WebP/AVIF；比原图还大就删掉，没有意义
+// 生成 WebP/AVIF：先写到临时文件，比原图小才改名成正式文件。
+// 已经存在的同名 .webp/.avif 默认不覆盖、更不删除（可能是用户自己做的），加 --force 才覆盖。
+// 返回新文件大小；没有生成返回 null。
 async function generateModern(file, originalSize, format) {
   const outPath = outputPathFor(file, `.${format}`);
+  const label = format.toUpperCase();
+  if (!force && (await pathExists(outPath))) {
+    console.log(`   └─ ⏩ ${label} already exists, kept as is (use --force to overwrite): ${path.basename(outPath)}`);
+    return null;
+  }
+  const tmpPath = `${outPath}.tmp-${process.pid}`;
   try {
     await fs.mkdir(path.dirname(outPath), { recursive: true });
-    await sharp(file)[format]({ quality }).toFile(outPath);
-    const size = (await fs.stat(outPath)).size;
+    await sharp(file)[format]({ quality }).toFile(tmpPath);
+    const size = (await fs.stat(tmpPath)).size;
     if (size >= originalSize) {
-      await fs.rm(outPath, { force: true });
-      console.log(`   └─ ⏩ ${format.toUpperCase()} would be larger than the original, skipped.`);
-      return;
+      await fs.rm(tmpPath, { force: true });
+      console.log(`   └─ ⏩ ${label} would be larger than the original, skipped.`);
+      return null;
     }
-    console.log(`   └─ 🟢 Generated ${format.toUpperCase()}: ${path.basename(outPath)} (${formatBytes(size)}) [Saved ${((originalSize - size) / originalSize * 100).toFixed(1)}%]`);
+    await moveFile(tmpPath, outPath);
+    console.log(`   └─ 🟢 Generated ${label}: ${path.basename(outPath)} (${formatBytes(size)}) [Saved ${((originalSize - size) / originalSize * 100).toFixed(1)}%]`);
+    return size;
   } catch (err) {
-    console.error(`   └─ ⚠️  Failed to generate ${format.toUpperCase()}: ${err.message}`);
+    await fs.rm(tmpPath, { force: true });
+    console.error(`   └─ ⚠️  Failed to generate ${label}: ${err.message}`);
+    return null;
   }
+}
+
+// --in-place 的备份：没有 .orig 就备份成 .orig；.orig 已存在但内容不同（中途换了新图），
+// 就另存为 .orig.2、.orig.3……，绝不覆盖旧备份，也不让新原图丢失
+async function backupOriginal(file) {
+  const first = file + '.orig';
+  if (!(await pathExists(first))) {
+    await fs.copyFile(file, first);
+    return first;
+  }
+  const current = await fs.readFile(file);
+  let candidate = first;
+  let n = 2;
+  while (await pathExists(candidate)) {
+    if (current.equals(await fs.readFile(candidate))) return candidate;
+    candidate = `${first}.${n}`;
+    n++;
+  }
+  await fs.copyFile(file, candidate);
+  return candidate;
+}
+
+// 最新的一份备份（.orig、.orig.2、.orig.3 里编号最大的）
+async function latestBackup(file) {
+  let latest = file + '.orig';
+  for (let n = 2; await pathExists(`${file}.orig.${n}`); n++) latest = `${file}.orig.${n}`;
+  return latest;
 }
 
 async function runOptimization() {
@@ -118,13 +157,20 @@ async function runOptimization() {
     let potentialSavedBytes = 0;   // 安全模式下：压缩原图能省多少（没有写入）
     // 生成的现代格式：原图总大小 vs 新文件总大小
     const modernStats = { webp: { count: 0, original: 0, output: 0 }, avif: { count: 0, original: 0, output: 0 } };
-    const recordModern = async (file, originalSize, format) => {
-      const st = await fs.stat(outputPathFor(file, `.${format}`)).catch(() => null);
-      if (!st) return;
+    const recordModern = (originalSize, format, size) => {
+      if (size == null) return;
       modernStats[format].count++;
       modernStats[format].original += originalSize;
-      modernStats[format].output += st.size;
+      modernStats[format].output += size;
     };
+
+    // photo.jpg 和 photo.png 都会生成 photo.webp，互相覆盖。这类同名图一律不生成现代格式，只提示
+    const stemCount = new Map();
+    for (const file of imageFiles) {
+      if (path.extname(file).toLowerCase() === '.webp') continue;
+      const stem = outputPathFor(file, '.x');
+      stemCount.set(stem, (stemCount.get(stem) || 0) + 1);
+    }
 
     for (const file of imageFiles) {
       const ext = path.extname(file).toLowerCase();
@@ -146,11 +192,13 @@ async function runOptimization() {
       console.log(`⚙️  Processing: ${rel}`);
 
       // 1. Generate modern formats (highly recommended for web performance)
-      await generateModern(file, originalSize, 'webp');
-      await recordModern(file, originalSize, 'webp');
-      if (generateAvif) {
-        await generateModern(file, originalSize, 'avif');
-        await recordModern(file, originalSize, 'avif');
+      if (stemCount.get(outputPathFor(file, '.x')) > 1) {
+        console.log(`   └─ ⚠️  Another image has the same name with a different extension, so WebP/AVIF is skipped to avoid overwriting. Rename one of them.`);
+      } else {
+        recordModern(originalSize, 'webp', await generateModern(file, originalSize, 'webp'));
+        if (generateAvif) {
+          recordModern(originalSize, 'avif', await generateModern(file, originalSize, 'avif'));
+        }
       }
       if (convertToWebpOnly) processedCount++;
 
@@ -176,10 +224,9 @@ async function runOptimization() {
             const saved = originalSize - compressedSize;
             const savedMsg = `${formatBytes(originalSize)} -> ${formatBytes(compressedSize)} [Saved ${(saved / originalSize * 100).toFixed(1)}%]`;
             if (inPlace) {
-              const backupPath = file + '.orig';
-              if (!(await pathExists(backupPath))) {
-                await fs.copyFile(file, backupPath);
-              }
+              // --force 重跑时当前文件就是上次压缩的结果，原图已在 .orig 里，不用再备份
+              const isOurOutput = manifest[rel] && manifest[rel].size === originalSize && (await pathExists(file + '.orig'));
+              const backupPath = isOurOutput ? await latestBackup(file) : await backupOriginal(file);
               await moveFile(tempOutPath, file);
               manifest[rel] = { size: compressedSize, optimizedAt: new Date().toISOString() };
               totalSavedBytes += saved;
