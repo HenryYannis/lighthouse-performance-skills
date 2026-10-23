@@ -148,7 +148,7 @@ npm run optimize -- --dir ./public/assets/images --in-place
 
 #### 📦 不克隆也能用
 两个工具都可以作为命令在任何目录下运行：
-命令固定到了某一个提交（`…/tar.gz/9154e24…`），`npx` 每次运行的都是可以审查的那份代码，而不是 `main` 上最新的代码。要升级，把这串哈希换成本仓库更新的提交即可（维护者：推送后运行 `git fetch && npm run pin`，所有地方一次改好）。（命令下载的是该提交的压缩包，而不是用 `github:` 写法，因为 npm 10 的 `npx` 无法拉取固定到某个提交的 `github:` 地址。）
+命令固定到了某一个提交（`…/tar.gz/9154e24…`），`npx` 每次运行的都是可以审查的那份代码，而不是 `main` 上最新的代码。要升级，把这串哈希换成本仓库更新的提交即可（维护者：代码推送到 `main` 后，GitHub Actions 会自动更新所有地方；手动更新可运行 `git fetch && npm run pin`）。（命令下载的是该提交的压缩包，而不是用 `github:` 写法，因为 npm 10 的 `npx` 无法拉取固定到某个提交的 `github:` 地址。）
 ```bash
 npx -y --allow-remote=all --allow-scripts=sharp https://codeload.github.com/HenryYannis/lighthouse-performance-skills/tar.gz/9154e243ba84e832d352e1b722d658f714cd35e5 audit --url http://localhost:3000 --output reports/baseline.json
 npx -y --allow-remote=all --allow-scripts=sharp https://codeload.github.com/HenryYannis/lighthouse-performance-skills/tar.gz/9154e243ba84e832d352e1b722d658f714cd35e5 optimize --dir ./public/assets/images
