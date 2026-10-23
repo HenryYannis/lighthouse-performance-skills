@@ -1,8 +1,21 @@
 #!/usr/bin/env node
 
-import fs from 'fs-extra';
+import fs from 'fs/promises';
 import path from 'path';
 import sharp from 'sharp';
+
+// 原来用 fs-extra 的几个方法，改用 Node 自带的 fs/promises 实现
+const pathExists = (p) => fs.access(p).then(() => true, () => false);
+async function moveFile(from, to) {
+  try {
+    await fs.rename(from, to);
+  } catch (err) {
+    if (err.code !== 'EXDEV') throw err;
+    // 跨磁盘时 rename 会失败，退回复制 + 删除
+    await fs.copyFile(from, to);
+    await fs.rm(from, { force: true });
+  }
+}
 
 // Parse arguments
 const args = process.argv.slice(2);
@@ -61,11 +74,11 @@ function outputPathFor(file, newExt) {
 async function generateModern(file, originalSize, format) {
   const outPath = outputPathFor(file, `.${format}`);
   try {
-    await fs.ensureDir(path.dirname(outPath));
+    await fs.mkdir(path.dirname(outPath), { recursive: true });
     await sharp(file)[format]({ quality }).toFile(outPath);
     const size = (await fs.stat(outPath)).size;
     if (size >= originalSize) {
-      await fs.remove(outPath);
+      await fs.rm(outPath, { force: true });
       console.log(`   └─ ⏩ ${format.toUpperCase()} would be larger than the original, skipped.`);
       return;
     }
@@ -77,7 +90,7 @@ async function generateModern(file, originalSize, format) {
 
 async function runOptimization() {
   try {
-    if (!(await fs.pathExists(targetDir))) {
+    if (!(await pathExists(targetDir))) {
       console.error(`❌ Target directory does not exist: ${targetDir}`);
       process.exit(1);
     }
@@ -97,7 +110,7 @@ async function runOptimization() {
 
     // manifest 记录 --in-place 处理过的文件，再次运行时跳过，避免一代代重复压缩
     const manifestPath = path.join(targetDir, MANIFEST_NAME);
-    const manifest = inPlace && (await fs.pathExists(manifestPath)) ? await fs.readJson(manifestPath) : {};
+    const manifest = inPlace && (await pathExists(manifestPath)) ? JSON.parse(await fs.readFile(manifestPath, 'utf8')) : {};
 
     let totalSavedBytes = 0;
     let processedCount = 0;
@@ -164,39 +177,39 @@ async function runOptimization() {
             const savedMsg = `${formatBytes(originalSize)} -> ${formatBytes(compressedSize)} [Saved ${(saved / originalSize * 100).toFixed(1)}%]`;
             if (inPlace) {
               const backupPath = file + '.orig';
-              if (!(await fs.pathExists(backupPath))) {
-                await fs.copy(file, backupPath);
+              if (!(await pathExists(backupPath))) {
+                await fs.copyFile(file, backupPath);
               }
-              await fs.move(tempOutPath, file, { overwrite: true });
+              await moveFile(tempOutPath, file);
               manifest[rel] = { size: compressedSize, optimizedAt: new Date().toISOString() };
               totalSavedBytes += saved;
               console.log(`   └─ ⚡ Compressed original in place: ${savedMsg} (backup: ${path.basename(backupPath)})`);
             } else if (outDir) {
               const outPath = outputPathFor(file);
-              await fs.ensureDir(path.dirname(outPath));
-              await fs.move(tempOutPath, outPath, { overwrite: true });
+              await fs.mkdir(path.dirname(outPath), { recursive: true });
+              await moveFile(tempOutPath, outPath);
               totalSavedBytes += saved;
               console.log(`   └─ ⚡ Compressed copy written to ${outPath}: ${savedMsg}`);
             } else {
-              await fs.remove(tempOutPath);
+              await fs.rm(tempOutPath, { force: true });
               console.log(`   └─ 💡 Compression could save: ${savedMsg} (original untouched)`);
               potentialSavedBytes += saved;
             }
           } else {
-            await fs.remove(tempOutPath);
+            await fs.rm(tempOutPath, { force: true });
             if (inPlace) manifest[rel] = { size: originalSize, optimizedAt: new Date().toISOString() };
             console.log(`   └─ ⏩ Original already optimal.`);
           }
           processedCount++;
         } catch (compErr) {
-          await fs.remove(tempOutPath);
+          await fs.rm(tempOutPath, { force: true });
           console.error(`   └─ ⚠️  Failed to compress original: ${compErr.message}`);
         }
       }
     }
 
     if (inPlace) {
-      await fs.writeJson(manifestPath, manifest, { spaces: 2 });
+      await fs.writeFile(manifestPath, JSON.stringify(manifest, null, 2) + '\n');
     }
 
     console.log('\n======================================================');
