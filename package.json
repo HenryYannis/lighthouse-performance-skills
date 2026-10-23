@@ -2,7 +2,6 @@
   "name": "lighthouse-performance-skills",
   "version": "1.0.0",
   "description": "Lighthouse & Web Vitals Performance Optimization Agent Skill",
-  "main": "scripts/run-lighthouse.js",
   "bin": {
     "lighthouse-performance-skills": "bin/cli.js"
   },

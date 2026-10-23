@@ -71,19 +71,21 @@ cd lighthouse-performance-skills
 npm install
 ```
 
-> **Note**: Requires **Node.js 22.19+** (required by Lighthouse 13), and **Google Chrome** or **Chromium** installed on your operating system for the audit script.
+> **Note**: Requires **Node.js 22.19+** (required by Lighthouse 13), and **Google Chrome** or **Chromium** installed on your operating system for the audit script. Chrome's sandbox stays on; it is turned off only when running as root (e.g. Docker), in CI (`CI=true`), or with `LH_NO_SANDBOX=1`.
 
 ### 🛠️ Troubleshooting (Sharp Installation issues)
 
-If you encounter installation warnings or permissions errors related to `sharp` (e.g., `npm warn allow-scripts sharp@0.33.x`), this is due to Node blocklisting postinstall scripts on restricted systems. You can resolve this by running:
-```bash
-npm config set ignore-scripts false
-npm install
-```
-Or manually approving the package build scripts:
-```bash
-npm approve-scripts sharp
-```
+If you see a warning like `npm warn allow-scripts sharp@...`, it comes from npm itself: newer npm versions (11.16+ / 12) block dependency install scripts unless they are approved. It has nothing to do with `ignore-scripts`.
+
+- After cloning this repo, approve sharp once inside the project folder, then install again:
+  ```bash
+  npm approve-scripts sharp
+  npm install
+  ```
+- When running through `npx` (there is no project `package.json` to record the approval), pass the flag instead:
+  ```bash
+  npx --allow-scripts=sharp -y github:HenryYannis/lighthouse-performance-skills optimize --dir ./public/images
+  ```
 
 ### 2. Try the Demo (Test it in 1 minute!)
 
@@ -135,9 +137,9 @@ npm run optimize -- --dir ./public/assets/images --in-place
 
 | Option | Description |
 | :--- | :--- |
-| `--dir` | Image folder to scan (default `./images`) |
-| `--quality` | Quality for lossy output, default `80` |
-| `--out <dir>` | Write compressed originals and WebP/AVIF to this folder, mirroring the structure |
+| `--dir` | Image folder to scan (default `./images`); symbolic links inside it are skipped |
+| `--quality` | Quality for lossy output, an integer from 1 to 100, default `80` |
+| `--out <dir>` | Write compressed originals and WebP/AVIF to this folder, mirroring the structure; files that could not be made smaller (and existing `.webp`) are copied over unchanged |
 | `--in-place` | Overwrite the originals, after backing each one up as `<file>.orig` (a replaced image gets `<file>.orig.2`, `.orig.3`…; old backups are never overwritten) |
 | `--force` | Overwrite existing `.webp`/`.avif` files (kept by default), and with `--in-place` re-process files already listed in `.optimize-images-manifest.json` |
 | `--avif` | Also generate AVIF |

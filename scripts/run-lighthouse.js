@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 
 import fs from 'fs/promises';
+import { realpathSync } from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import lighthouse from 'lighthouse';
 import * as chromeLauncher from 'chrome-launcher';
 import desktopConfig from 'lighthouse/core/config/desktop-config.js';
@@ -28,13 +30,13 @@ const jsonPath = `${outputBase}.json`;
 const htmlPath = `${outputBase}.html`;
 const mdPath = `${outputBase}.md`;
 
-console.log(`\n======================================================`);
-console.log(`⚡ Starting Lighthouse Audit for: ${url}`);
-console.log(`📱 Preset: ${preset} | Runs: ${runs}`);
-console.log(`======================================================\n`);
-
 async function runAudit() {
   let chrome;
+
+  console.log(`\n======================================================`);
+  console.log(`⚡ Starting Lighthouse Audit for: ${url}`);
+  console.log(`📱 Preset: ${preset} | Runs: ${runs}`);
+  console.log(`======================================================\n`);
 
   // Setup clean exit on interruption to prevent process leaks
   const cleanExit = async () => {
@@ -47,10 +49,14 @@ async function runAudit() {
   process.on('SIGINT', cleanExit);
   process.on('SIGTERM', cleanExit);
 
+  // 只接受 http/https，file://、chrome://、javascript: 一律拒绝
+  let parsedUrl = null;
   try {
-    // Validate URL input
-    new URL(url);
+    parsedUrl = new URL(url);
   } catch (e) {
+    // 下面统一报错
+  }
+  if (!parsedUrl || !['http:', 'https:'].includes(parsedUrl.protocol)) {
     console.error(`❌ Invalid URL provided: "${url}". Please provide a valid HTTP/HTTPS URL.`);
     process.exit(1);
   }
@@ -69,9 +75,20 @@ async function runAudit() {
     await fs.mkdir(path.dirname(jsonPath), { recursive: true });
 
     console.log('🌐 Launching headless Chrome...');
-    chrome = await chromeLauncher.launch({
-      chromeFlags: ['--headless=new', '--disable-gpu', '--no-sandbox']
-    });
+    // 默认保留 Chrome 沙箱。只有 root 用户（如 Docker）或 CI 环境才关掉，否则 Chrome 起不来；
+    // 也可以用 LH_NO_SANDBOX=1 手动关闭
+    const isRoot = typeof process.getuid === 'function' && process.getuid() === 0;
+    const noSandbox = isRoot || process.env.CI === 'true' || process.env.LH_NO_SANDBOX === '1';
+    const chromeFlags = ['--headless=new', '--disable-gpu'];
+    if (noSandbox) chromeFlags.push('--no-sandbox');
+    try {
+      chrome = await chromeLauncher.launch({ chromeFlags });
+    } catch (launchErr) {
+      console.error('❌ Could not launch Chrome:', launchErr.message);
+      console.error('💡 Make sure Google Chrome or Chromium is installed, or set CHROME_PATH to its executable.');
+      process.exitCode = 1;
+      return;
+    }
 
     console.log(`🚦 Running audit on port ${chrome.port}...`);
     const options = {
@@ -85,8 +102,7 @@ async function runAudit() {
     const results = [];
     for (let i = 1; i <= runs; i++) {
       const result = await lighthouse(url, options, config);
-      const perf = result.lhr.categories.performance.score * 100;
-      console.log(`   Run ${i}/${runs}: Performance ${perf.toFixed(0)}`);
+      console.log(`   Run ${i}/${runs}: Performance ${fmtScore(toScore(result.lhr.categories.performance.score))}`);
       results.push(result);
     }
 
@@ -95,7 +111,7 @@ async function runAudit() {
     const runnerResult = results.find((r) => r.lhr === medianLhr) || results[0];
     const [, htmlReport] = runnerResult.report;
     if (runs > 1) {
-      console.log(`📌 Using the median run (Performance ${(runnerResult.lhr.categories.performance.score * 100).toFixed(0)})`);
+      console.log(`📌 Using the median run (Performance ${fmtScore(toScore(runnerResult.lhr.categories.performance.score))})`);
     }
     
     // Write full JSON report
@@ -108,10 +124,10 @@ async function runAudit() {
 
     // Parse main scores
     const scores = {
-      performance: runnerResult.lhr.categories.performance.score * 100,
-      accessibility: runnerResult.lhr.categories.accessibility.score * 100,
-      bestPractices: runnerResult.lhr.categories['best-practices'].score * 100,
-      seo: runnerResult.lhr.categories.seo.score * 100,
+      performance: toScore(runnerResult.lhr.categories.performance.score),
+      accessibility: toScore(runnerResult.lhr.categories.accessibility.score),
+      bestPractices: toScore(runnerResult.lhr.categories['best-practices'].score),
+      seo: toScore(runnerResult.lhr.categories.seo.score),
     };
 
     // Parse key Web Vitals
@@ -128,10 +144,10 @@ async function runAudit() {
     console.log('\n======================================================');
     console.log('📈 LIGHTHOUSE RUN SUMMARY');
     console.log('======================================================');
-    console.log(`Performance:      [ ${getScoreColor(scores.performance)} ] ${scores.performance.toFixed(0)}/100`);
-    console.log(`Accessibility:    [ ${getScoreColor(scores.accessibility)} ] ${scores.accessibility.toFixed(0)}/100`);
-    console.log(`Best Practices:   [ ${getScoreColor(scores.bestPractices)} ] ${scores.bestPractices.toFixed(0)}/100`);
-    console.log(`SEO:              [ ${getScoreColor(scores.seo)} ] ${scores.seo.toFixed(0)}/100`);
+    console.log(`Performance:      [ ${getScoreColor(scores.performance)} ] ${fmtScore(scores.performance)}/100`);
+    console.log(`Accessibility:    [ ${getScoreColor(scores.accessibility)} ] ${fmtScore(scores.accessibility)}/100`);
+    console.log(`Best Practices:   [ ${getScoreColor(scores.bestPractices)} ] ${fmtScore(scores.bestPractices)}/100`);
+    console.log(`SEO:              [ ${getScoreColor(scores.seo)} ] ${fmtScore(scores.seo)}/100`);
     console.log('------------------------------------------------------');
     console.log(`First Contentful Paint (FCP):       ${metrics.fcp}`);
     console.log(`Largest Contentful Paint (LCP):     ${metrics.lcp}`);
@@ -147,10 +163,7 @@ async function runAudit() {
 
   } catch (err) {
     console.error('❌ Error running Lighthouse audit:', err.message);
-    if (err.message.includes('Chrome debugging port')) {
-      console.error('💡 Ensure Google Chrome or Chromium is installed on your system.');
-    }
-    process.exit(1);
+    process.exitCode = 1;
   } finally {
     if (chrome) {
       await chrome.kill();
@@ -158,7 +171,17 @@ async function runAudit() {
   }
 }
 
+// Lighthouse 某个子审计出错时，分类分数是 null（比如页面没渲染出内容 NO_FCP），不能当成 0 分
+function toScore(raw) {
+  return typeof raw === 'number' ? raw * 100 : null;
+}
+
+function fmtScore(score) {
+  return score === null ? 'N/A' : score.toFixed(0);
+}
+
 function getScoreColor(score) {
+  if (score === null) return '⚪ No score (audit error, see the HTML report)';
   if (score >= 90) return '🟢 Excellent';
   if (score >= 50) return '🟡 Needs Work';
   return '🔴 Poor';
@@ -166,6 +189,7 @@ function getScoreColor(score) {
 
 function generateMarkdownSummary(targetUrl, scores, metrics, lhr) {
   const getBadge = (score) => {
+    if (score === null) return '![N/A](https://img.shields.io/badge/Score-N%2FA-lightgrey?style=for-the-badge)';
     const color = score >= 90 ? 'green' : score >= 50 ? 'orange' : 'red';
     return `![${score}](https://img.shields.io/badge/Score-${score.toFixed(0)}%2F100-${color}?style=for-the-badge)`;
   };
@@ -226,4 +250,17 @@ ${opportunitiesMd}
 `;
 }
 
-runAudit();
+// 只在直接运行脚本时执行；被 import 时不会自动开始审计
+function isMainModule() {
+  if (!process.argv[1]) return false;
+  const norm = (p) => {
+    let real = path.resolve(p);
+    try { real = realpathSync(real); } catch { /* 用原路径 */ }
+    return process.platform === 'win32' ? real.toLowerCase() : real;
+  };
+  return norm(process.argv[1]) === norm(fileURLToPath(import.meta.url));
+}
+
+if (isMainModule()) {
+  runAudit();
+}
