@@ -40,7 +40,7 @@ Before making any performance modifications, run a diagnostic audit to establish
 ### Step 2: Asset Optimization (资源优化)
 
 #### 1. Image Compression & Modern Formats
-Images are usually the largest payload. Run `optimize-images.js` to batch-process local images. By default it only creates `.webp` files next to the originals and never modifies the originals:
+Images are usually the largest payload. Run `optimize-images.js` to batch-process local images. By default it only creates `.webp` files next to the originals, never modifies the originals, and keeps any `.webp`/`.avif` that already exists (pass `--force` to overwrite). Images that share a name with different extensions (`photo.jpg` + `photo.png`) get no WebP, since they would overwrite each other:
 ```bash
 node <skill-repo>/scripts/optimize-images.js --dir ./public/assets/images --quality 80
 ```
