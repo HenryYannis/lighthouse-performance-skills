@@ -14,7 +14,7 @@
 
 | 优化前 (CLS: 0.79, 跑分: 75 🟡) | 优化后 (CLS: 0.054, 跑分: 98 🟢) |
 | :---: | :---: |
-| ![Baseline](./docs/assets/baseline.png) | ![Optimized](./docs/assets/optimized.png) |
+| ![Baseline](./docs/assets/baseline.webp) | ![Optimized](./docs/assets/optimized.webp) |
 
 ---
 
