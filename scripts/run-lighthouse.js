@@ -170,18 +170,33 @@ function generateMarkdownSummary(targetUrl, scores, metrics, lhr) {
     return `![${score}](https://img.shields.io/badge/Score-${score.toFixed(0)}%2F100-${color}?style=for-the-badge)`;
   };
 
-  // Extract top performance opportunities
-  const opportunities = Object.values(lhr.audits)
-    .filter(audit => audit.details && audit.details.type === 'opportunity' && audit.details.overallSavingsMs > 0)
-    .sort((a, b) => b.details.overallSavingsMs - a.details.overallSavingsMs)
+  // Extract top performance opportunities.
+  // Lighthouse 12+ 把大部分 "opportunity" 换成了 "*-insight" 审计（用 metricSavings 表示可节省的时间），
+  // 这里两种都读，避免升级后摘要变空。
+  const opportunities = Object.entries(lhr.audits)
+    .map(([id, audit]) => {
+      const details = audit.details || {};
+      if (details.type === 'opportunity' && details.overallSavingsMs > 0) {
+        return { audit, savingsMs: details.overallSavingsMs };
+      }
+      if (id.endsWith('-insight') && typeof audit.score === 'number' && audit.score < 1) {
+        const ms = audit.metricSavings || {};
+        return { audit, savingsMs: Math.max(ms.LCP || 0, ms.FCP || 0) };
+      }
+      return null;
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.savingsMs - a.savingsMs)
     .slice(0, 5);
 
   let opportunitiesMd = '';
   if (opportunities.length > 0) {
     opportunitiesMd = '\n### 🔍 Top Performance Opportunities\n| Opportunity | Estimated Savings |\n| :--- | :--- |\n';
-    opportunities.forEach(op => {
-      const savings = (op.details.overallSavingsMs / 1000).toFixed(2);
-      opportunitiesMd += `| **${op.title}**<br>${op.description.split('.')[0]}. | ${savings}s |\n`;
+    opportunities.forEach(({ audit, savingsMs }) => {
+      const savings = savingsMs > 0 ? `${(savingsMs / 1000).toFixed(2)}s` : '-';
+      // 去掉 markdown 链接再取第一句，避免把链接截断
+      const firstSentence = (audit.description || '').replace(/\[([^\]]+)\]\([^)]+\)/g, '$1').split('. ')[0].replace(/\.$/, '');
+      opportunitiesMd += `| **${audit.title}**<br>${firstSentence}. | ${savings} |\n`;
     });
   } else {
     opportunitiesMd = '\n🎉 No major performance opportunities found!';
