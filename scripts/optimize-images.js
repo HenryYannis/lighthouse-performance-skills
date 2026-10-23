@@ -25,7 +25,8 @@ const getArg = (flag) => {
 };
 
 const targetDir = getArg('--dir') || './images';
-const quality = parseInt(getArg('--quality') || '80', 10);
+const qualityArg = getArg('--quality') || '80';
+const quality = /^\d+$/.test(qualityArg) ? Number(qualityArg) : NaN;
 const outDir = getArg('--out');                     // 输出到单独目录，原图不动
 const inPlace = args.includes('--in-place');        // 明确要求才覆盖原图（会先备份 .orig）
 const force = args.includes('--force');             // 忽略 manifest 重新处理；覆盖已存在的 .webp/.avif
@@ -50,7 +51,12 @@ async function walkDir(dir, fileList = [], skipDir = null) {
   for (const file of files) {
     const filePath = path.join(dir, file);
     if (skipDir && path.resolve(filePath) === skipDir) continue;
-    const stat = await fs.stat(filePath);
+    // 用 lstat，不跟随符号链接：避免循环链接、坏链接让整批中止，也避免改到目录外的文件
+    const stat = await fs.lstat(filePath);
+    if (stat.isSymbolicLink()) {
+      console.log(`⏩ Skipping symbolic link: ${filePath}`);
+      continue;
+    }
     if (stat.isDirectory()) {
       await walkDir(filePath, fileList, skipDir);
     } else {
@@ -120,6 +126,15 @@ async function backupOriginal(file) {
   return candidate;
 }
 
+// --out 模式：没压缩的文件原样拷到输出目录（已存在就不动，除非 --force）
+async function copyIntoOut(file) {
+  const outPath = outputPathFor(file);
+  if (!force && (await pathExists(outPath))) return;
+  await fs.mkdir(path.dirname(outPath), { recursive: true });
+  await fs.copyFile(file, outPath);
+  console.log(`   └─ 📄 Copied unchanged to ${outPath}`);
+}
+
 // 最新的一份备份（.orig、.orig.2、.orig.3 里编号最大的）
 async function latestBackup(file) {
   let latest = file + '.orig';
@@ -131,6 +146,10 @@ async function runOptimization() {
   try {
     if (!(await pathExists(targetDir))) {
       console.error(`❌ Target directory does not exist: ${targetDir}`);
+      process.exit(1);
+    }
+    if (!Number.isInteger(quality) || quality < 1 || quality > 100) {
+      console.error(`❌ Invalid --quality "${qualityArg}". Use an integer from 1 to 100.`);
       process.exit(1);
     }
     if (outDir && inPlace) {
@@ -175,8 +194,9 @@ async function runOptimization() {
     for (const file of imageFiles) {
       const ext = path.extname(file).toLowerCase();
       
-      // .webp 已经是现代格式，跳过
+      // .webp 已经是现代格式，不再处理；--out 模式下原样拷进输出目录，保证输出目录完整
       if (ext === '.webp') {
+        if (outDir) await copyIntoOut(file);
         continue;
       }
 
@@ -246,6 +266,7 @@ async function runOptimization() {
             await fs.rm(tempOutPath, { force: true });
             if (inPlace) manifest[rel] = { size: originalSize, optimizedAt: new Date().toISOString() };
             console.log(`   └─ ⏩ Original already optimal.`);
+            if (outDir) await copyIntoOut(file);
           }
           processedCount++;
         } catch (compErr) {

@@ -71,19 +71,21 @@ cd lighthouse-performance-skills
 npm install
 ```
 
-> **注意**：需要 **Node.js 22.19+**（Lighthouse 13 的要求）；运行审计脚本还需要系统已安装 **Google Chrome** 或 **Chromium** 浏览器。
+> **注意**：需要 **Node.js 22.19+**（Lighthouse 13 的要求）；运行审计脚本还需要系统已安装 **Google Chrome** 或 **Chromium** 浏览器。Chrome 沙箱默认开启，只有以 root 运行（如 Docker）、在 CI 中（`CI=true`）或设置 `LH_NO_SANDBOX=1` 时才关闭。
 
 ### 🛠️ 常见问题（Sharp 库安装失败提示）
 
-如果您在运行 `npm install` 时遇到与 `sharp` 相关的安装警告或权限报错（例如 `npm warn allow-scripts sharp@0.33.x`），这通常是由于系统或网络策略限制了 Node 的原生编译和脚本下载。您可以通过以下命令尝试解决：
-```bash
-npm config set ignore-scripts false
-npm install
-```
-或者手动批准该包的底层运行脚本：
-```bash
-npm approve-scripts sharp
-```
+如果看到 `npm warn allow-scripts sharp@...` 这样的提示，这是 npm 自己的机制：较新的 npm（11.16+ / 12）默认拦截依赖包的安装脚本，需要先批准，和 `ignore-scripts` 设置无关。
+
+- 克隆本仓库后，在项目目录里批准一次 sharp，再重新安装：
+  ```bash
+  npm approve-scripts sharp
+  npm install
+  ```
+- 通过 `npx` 运行时（没有项目 `package.json` 可以记录批准），改用参数：
+  ```bash
+  npx --allow-scripts=sharp -y github:HenryYannis/lighthouse-performance-skills optimize --dir ./public/images
+  ```
 
 ### 2. 试用 Demo (1分钟极速上手体验)
 
@@ -135,9 +137,9 @@ npm run optimize -- --dir ./public/assets/images --in-place
 
 | 参数 | 说明 |
 | :--- | :--- |
-| `--dir` | 要扫描的图片目录（默认 `./images`） |
-| `--quality` | 有损压缩质量，默认 `80` |
-| `--out <dir>` | 把压缩后的原格式和 WebP/AVIF 按原目录结构写到这个目录 |
+| `--dir` | 要扫描的图片目录（默认 `./images`），其中的符号链接会跳过 |
+| `--quality` | 有损压缩质量，1 到 100 的整数，默认 `80` |
+| `--out <dir>` | 把压缩后的原格式和 WebP/AVIF 按原目录结构写到这个目录；压不小的原图和已有的 `.webp` 原样拷过去 |
 | `--in-place` | 覆盖原图，覆盖前把每个文件备份成 `<文件名>.orig`（中途换了新图会另存为 `.orig.2`、`.orig.3`……，旧备份绝不覆盖） |
 | `--force` | 覆盖已存在的 `.webp`/`.avif`（默认保留不动）；配合 `--in-place` 时重新处理 `.optimize-images-manifest.json` 里已记录的文件 |
 | `--avif` | 同时生成 AVIF |
