@@ -13,22 +13,33 @@ const getArg = (flag) => {
 
 const targetDir = getArg('--dir') || './images';
 const quality = parseInt(getArg('--quality') || '80', 10);
+const outDir = getArg('--out');                     // 输出到单独目录，原图不动
+const inPlace = args.includes('--in-place');        // 明确要求才覆盖原图（会先备份 .orig）
+const force = args.includes('--force');             // 忽略 manifest，重新处理
 const convertToWebpOnly = args.includes('--webp-only');
+const generateAvif = args.includes('--avif');
+const pngPalette = args.includes('--png-palette');  // PNG 默认无损，加这个才量化成 256 色
+
+const MANIFEST_NAME = '.optimize-images-manifest.json';
 
 console.log(`\n======================================================`);
 console.log(`🖼️  Starting Image Optimization in: ${targetDir}`);
 console.log(`🎯 Quality target: ${quality}%`);
+if (outDir) console.log(`📁 Output directory: ${outDir} (originals untouched)`);
+else if (inPlace) console.log(`✏️  In-place mode: originals are backed up as *.orig before overwriting`);
+else console.log(`🔒 Safe mode: originals are not modified (use --out <dir> or --in-place to keep compressed copies)`);
 console.log(`======================================================\n`);
 
 const SUPPORTED_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.tiff', '.webp'];
 
-async function walkDir(dir, fileList = []) {
+async function walkDir(dir, fileList = [], skipDir = null) {
   const files = await fs.readdir(dir);
   for (const file of files) {
     const filePath = path.join(dir, file);
+    if (skipDir && path.resolve(filePath) === skipDir) continue;
     const stat = await fs.stat(filePath);
     if (stat.isDirectory()) {
-      await walkDir(filePath, fileList);
+      await walkDir(filePath, fileList, skipDir);
     } else {
       const ext = path.extname(file).toLowerCase();
       if (SUPPORTED_EXTENSIONS.includes(ext)) {
@@ -39,15 +50,44 @@ async function walkDir(dir, fileList = []) {
   return fileList;
 }
 
+// 输出路径：有 --out 时镜像目录结构写到 out 目录，否则写在原图旁边
+function outputPathFor(file, newExt) {
+  const rel = path.relative(targetDir, file);
+  const base = outDir ? path.join(outDir, rel) : file;
+  return newExt ? base.substring(0, base.lastIndexOf('.')) + newExt : base;
+}
+
+// 生成 WebP/AVIF；比原图还大就删掉，没有意义
+async function generateModern(file, originalSize, format) {
+  const outPath = outputPathFor(file, `.${format}`);
+  try {
+    await fs.ensureDir(path.dirname(outPath));
+    await sharp(file)[format]({ quality }).toFile(outPath);
+    const size = (await fs.stat(outPath)).size;
+    if (size >= originalSize) {
+      await fs.remove(outPath);
+      console.log(`   └─ ⏩ ${format.toUpperCase()} would be larger than the original, skipped.`);
+      return;
+    }
+    console.log(`   └─ 🟢 Generated ${format.toUpperCase()}: ${path.basename(outPath)} (${formatBytes(size)}) [Saved ${((originalSize - size) / originalSize * 100).toFixed(1)}%]`);
+  } catch (err) {
+    console.error(`   └─ ⚠️  Failed to generate ${format.toUpperCase()}: ${err.message}`);
+  }
+}
+
 async function runOptimization() {
   try {
     if (!(await fs.pathExists(targetDir))) {
       console.error(`❌ Target directory does not exist: ${targetDir}`);
       process.exit(1);
     }
+    if (outDir && inPlace) {
+      console.error('❌ Use either --out or --in-place, not both.');
+      process.exit(1);
+    }
 
     console.log('🔍 Scanning directory for images...');
-    const imageFiles = await walkDir(targetDir);
+    const imageFiles = await walkDir(targetDir, [], outDir ? path.resolve(outDir) : null);
     console.log(`ℹ️  Found ${imageFiles.length} image(s) to process.\n`);
 
     if (imageFiles.length === 0) {
@@ -55,73 +95,92 @@ async function runOptimization() {
       return;
     }
 
+    // manifest 记录 --in-place 处理过的文件，再次运行时跳过，避免一代代重复压缩
+    const manifestPath = path.join(targetDir, MANIFEST_NAME);
+    const manifest = inPlace && (await fs.pathExists(manifestPath)) ? await fs.readJson(manifestPath) : {};
+
     let totalSavedBytes = 0;
     let processedCount = 0;
 
     for (const file of imageFiles) {
       const ext = path.extname(file).toLowerCase();
       
-      // Skip already optimized webp images if we're generating new webp files
-      if (ext === '.webp' && !convertToWebpOnly) {
+      // .webp 已经是现代格式，跳过
+      if (ext === '.webp') {
         continue;
       }
 
-      console.log(`⚙️  Processing: ${path.basename(file)}`);
-      
-      const fileStat = await fs.stat(file);
-      const originalSize = fileStat.size;
+      const rel = path.relative(targetDir, file);
+      const originalSize = (await fs.stat(file)).size;
 
-      // 1. Generate WebP alternative (highly recommended for web performance)
-      if (ext !== '.webp') {
-        const webpPath = file.substring(0, file.lastIndexOf('.')) + '.webp';
-        try {
-          await sharp(file)
-            .webp({ quality })
-            .toFile(webpPath);
-          
-          const webpStat = await fs.stat(webpPath);
-          const webpSize = webpStat.size;
-          const webpSavings = originalSize - webpSize;
-          
-          console.log(`   └─ 🟢 Generated WebP: ${path.basename(webpPath)} (${formatBytes(webpSize)}) [Saved ${(webpSavings / originalSize * 100).toFixed(1)}%]`);
-        } catch (webpErr) {
-          console.error(`   └─ ⚠️  Failed to generate WebP: ${webpErr.message}`);
-        }
+      if (inPlace && !force && manifest[rel] && manifest[rel].size === originalSize) {
+        console.log(`⏩ Skipping (already optimized, see ${MANIFEST_NAME}): ${rel}`);
+        continue;
       }
 
-      // 2. Compress the original format (in place) unless --webp-only is specified
-      if (!convertToWebpOnly && ext !== '.webp') {
+      console.log(`⚙️  Processing: ${rel}`);
+
+      // 1. Generate modern formats (highly recommended for web performance)
+      await generateModern(file, originalSize, 'webp');
+      if (generateAvif) {
+        await generateModern(file, originalSize, 'avif');
+      }
+
+      // 2. Compress the original format unless --webp-only is specified
+      if (!convertToWebpOnly) {
+        const tempOutPath = file + '.tmp';
         try {
-          const tempOutPath = file + '.tmp';
           let pipeline = sharp(file);
           
           if (ext === '.png') {
-            pipeline = pipeline.png({ quality, compressionLevel: 8, palette: true });
+            pipeline = pngPalette
+              ? pipeline.png({ quality, compressionLevel: 9, palette: true })
+              : pipeline.png({ compressionLevel: 9 }); // 默认无损
           } else if (ext === '.jpg' || ext === '.jpeg') {
             pipeline = pipeline.jpeg({ quality, mozjpeg: true });
           }
 
           await pipeline.toFile(tempOutPath);
           
-          const compressedStat = await fs.stat(tempOutPath);
-          const compressedSize = compressedStat.size;
+          const compressedSize = (await fs.stat(tempOutPath)).size;
 
           if (compressedSize < originalSize) {
-            // Overwrite original with compressed version
-            await fs.move(tempOutPath, file, { overwrite: true });
             const saved = originalSize - compressedSize;
-            totalSavedBytes += saved;
-            console.log(`   └─ ⚡ Compressed original: ${formatBytes(originalSize)} -> ${formatBytes(compressedSize)} [Saved ${(saved / originalSize * 100).toFixed(1)}%]`);
+            const savedMsg = `${formatBytes(originalSize)} -> ${formatBytes(compressedSize)} [Saved ${(saved / originalSize * 100).toFixed(1)}%]`;
+            if (inPlace) {
+              const backupPath = file + '.orig';
+              if (!(await fs.pathExists(backupPath))) {
+                await fs.copy(file, backupPath);
+              }
+              await fs.move(tempOutPath, file, { overwrite: true });
+              manifest[rel] = { size: compressedSize, optimizedAt: new Date().toISOString() };
+              totalSavedBytes += saved;
+              console.log(`   └─ ⚡ Compressed original in place: ${savedMsg} (backup: ${path.basename(backupPath)})`);
+            } else if (outDir) {
+              const outPath = outputPathFor(file);
+              await fs.ensureDir(path.dirname(outPath));
+              await fs.move(tempOutPath, outPath, { overwrite: true });
+              totalSavedBytes += saved;
+              console.log(`   └─ ⚡ Compressed copy written to ${outPath}: ${savedMsg}`);
+            } else {
+              await fs.remove(tempOutPath);
+              console.log(`   └─ 💡 Compression could save: ${savedMsg} (original untouched)`);
+            }
           } else {
-            // Compressed size was larger, discard temp
             await fs.remove(tempOutPath);
+            if (inPlace) manifest[rel] = { size: originalSize, optimizedAt: new Date().toISOString() };
             console.log(`   └─ ⏩ Original already optimal.`);
           }
           processedCount++;
         } catch (compErr) {
+          await fs.remove(tempOutPath);
           console.error(`   └─ ⚠️  Failed to compress original: ${compErr.message}`);
         }
       }
+    }
+
+    if (inPlace) {
+      await fs.writeJson(manifestPath, manifest, { spaces: 2 });
     }
 
     console.log('\n======================================================');
