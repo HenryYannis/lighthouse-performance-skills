@@ -17,10 +17,13 @@
   ],
   "author": "Henry Yannis",
   "license": "MIT",
+  "engines": {
+    "node": ">=22.19"
+  },
   "dependencies": {
     "chrome-launcher": "^1.1.1",
     "fs-extra": "^11.2.0",
-    "lighthouse": "^11.5.0",
+    "lighthouse": "^13.5.0",
     "sharp": "^0.33.2"
   }
 }
