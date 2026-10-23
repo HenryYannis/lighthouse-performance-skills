@@ -82,9 +82,9 @@ If you see a warning like `npm warn allow-scripts sharp@...`, it comes from npm 
   npm approve-scripts sharp
   npm install
   ```
-- When running through `npx` (there is no project `package.json` to record the approval), pass the flag instead:
+- When running through `npx` (there is no project `package.json` to record the approval), pass the flag instead. `--allow-remote=all` is needed on npm 12, which refuses packages fetched from a URL by default; older npm ignores it:
   ```bash
-  npx --allow-scripts=sharp -y github:HenryYannis/lighthouse-performance-skills optimize --dir ./public/images
+  npx -y --allow-remote=all --allow-scripts=sharp https://codeload.github.com/HenryYannis/lighthouse-performance-skills/tar.gz/14cb046376d37d5c44cbddd22cb52a42da527ae5 optimize --dir ./public/images
   ```
 
 ### 2. Try the Demo (Test it in 1 minute!)
@@ -147,10 +147,10 @@ npm run optimize -- --dir ./public/assets/images --in-place
 | `--webp-only` | Only generate modern formats, never compress the originals |
 
 #### 📦 Run Without Cloning
-Both tools are also available as a command, so they can be run from any folder:
+Both tools are also available as a command, so they can be run from any folder. The commands are pinned to a specific commit (`…/tar.gz/14cb046…`), so `npx` always runs code you can review instead of whatever is newest on `main`. To upgrade, replace the hash with a newer commit from this repo. (The commands download a tarball of that commit instead of using `github:`, because `npx` cannot fetch a `github:` spec pinned to a commit on npm 10.)
 ```bash
-npx -y github:HenryYannis/lighthouse-performance-skills audit --url http://localhost:3000 --output reports/baseline.json
-npx -y github:HenryYannis/lighthouse-performance-skills optimize --dir ./public/assets/images
+npx -y --allow-remote=all --allow-scripts=sharp https://codeload.github.com/HenryYannis/lighthouse-performance-skills/tar.gz/14cb046376d37d5c44cbddd22cb52a42da527ae5 audit --url http://localhost:3000 --output reports/baseline.json
+npx -y --allow-remote=all --allow-scripts=sharp https://codeload.github.com/HenryYannis/lighthouse-performance-skills/tar.gz/14cb046376d37d5c44cbddd22cb52a42da527ae5 optimize --dir ./public/assets/images
 ```
 
 ---
@@ -164,8 +164,8 @@ Keep the skill directory in your workspace. When asking Antigravity to "optimize
 Copy `rules/lighthouse-performance.mdc` to `.cursor/rules/lighthouse-performance.mdc` in your project. The rule uses `alwaysApply: false`, so Cursor's agent loads it only when a task matches its description. Alternatively, reference the workflow in your `.cursorrules`:
 ```markdown
 For any web performance optimization tasks, follow the workflow defined in:
-1. Run `npx -y github:HenryYannis/lighthouse-performance-skills audit --url <url> --output reports/baseline.json` to establish a baseline.
-2. Run `npx -y github:HenryYannis/lighthouse-performance-skills optimize --dir <image folder>` to optimize images.
+1. Run `npx -y --allow-remote=all --allow-scripts=sharp https://codeload.github.com/HenryYannis/lighthouse-performance-skills/tar.gz/14cb046376d37d5c44cbddd22cb52a42da527ae5 audit --url <url> --output reports/baseline.json` to establish a baseline.
+2. Run `npx -y --allow-remote=all --allow-scripts=sharp https://codeload.github.com/HenryYannis/lighthouse-performance-skills/tar.gz/14cb046376d37d5c44cbddd22cb52a42da527ae5 optimize --dir <image folder>` to optimize images.
 3. Perform source code optimizations (defer scripts, lazy load, fix CLS dimensions).
 4. Run audit again to verify improvements and render a before/after comparison table.
 ```
@@ -178,7 +178,7 @@ mkdir -p ~/.claude/skills && cp -r skills/lighthouse-performance-skills ~/.claud
 # Or only the current project
 mkdir -p .claude/skills && cp -r /path/to/lighthouse-performance-skills/skills/lighthouse-performance-skills .claude/skills/
 ```
-Claude Code picks the skill up automatically from the `description` in `SKILL.md` when you ask it to speed up a page or raise the Lighthouse score; there is no need to tell it to read the file each time. When only the skill folder is installed, the skill runs the helper scripts through `npx -y github:HenryYannis/lighthouse-performance-skills`.
+Claude Code picks the skill up automatically from the `description` in `SKILL.md` when you ask it to speed up a page or raise the Lighthouse score; there is no need to tell it to read the file each time. When only the skill folder is installed, the skill runs the helper scripts through `npx -y --allow-remote=all --allow-scripts=sharp https://codeload.github.com/HenryYannis/lighthouse-performance-skills/tar.gz/14cb046376d37d5c44cbddd22cb52a42da527ae5`.
 
 > **Editing the instructions**: `SKILL.md` is the single source. After changing it, run `node scripts/sync-rules.js` to regenerate the Cursor rule.
 
